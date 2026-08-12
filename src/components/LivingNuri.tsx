@@ -16,10 +16,7 @@ type Handle = {
   dispose: () => void;
 };
 
-/**
- * Realtime Three.js mesh Nuri — continuously animated limbs/face.
- * Not Image pose swaps. Not textured photo planes.
- */
+/** Realtime WebGL Nuri — beauty relief GLB, continuously animated. */
 export function LivingNuri({ behavior, size = 320 }: Props) {
   const hostRef = useRef<View>(null);
   const handleRef = useRef<Handle | null>(null);
@@ -43,11 +40,9 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
 
       const { mountNuri3D } = await import('../nuri3d/mountNuri3D');
       if (cancelled) return;
-
       handleRef.current = mountNuri3D(canvas, size, behavior);
     };
 
-    // wait one frame so RNW lays out the host (non-zero clientWidth)
     raf = requestAnimationFrame(() => {
       start().catch((e) => console.error('[LivingNuri]', e));
     });
@@ -87,7 +82,7 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
         height: size,
         borderRadius: 28,
         overflow: 'hidden',
-        backgroundColor: '#D9E8F2',
+        backgroundColor: '#2B3138',
       }}
     />
   );
