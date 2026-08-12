@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Image, Platform, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 import type { Behavior } from '../logic/behavior';
 import type { Equipped } from '../shop/catalog';
 
@@ -10,7 +10,9 @@ type Props = {
   size?: number;
 };
 
-const poseModules = {
+type Pose = 'idle' | 'sleepy' | 'blink' | 'wave' | 'kick';
+
+const poses: Record<Pose, number> = {
   idle: require('../../assets/nuri3d/idle.jpg'),
   sleepy: require('../../assets/nuri3d/sleepy.jpg'),
   blink: require('../../assets/nuri3d/blink.jpg'),
@@ -18,77 +20,180 @@ const poseModules = {
   kick: require('../../assets/nuri3d/kick.jpg'),
 };
 
-function uriOf(mod: number) {
-  const src = Image.resolveAssetSource(mod);
-  return src?.uri ?? '';
-}
-
 /**
- * The pretty rendered Nuri — same look as the good pictures —
- * living in a realtime 3D stage (breath/sway + behavior poses).
+ * Beautiful rendered Nuri that always shows + continuous motion.
+ * No fragile WebGL texture loading — Image is reliable on Pages.
  */
-export function LivingNuri({ behavior, size = 320 }: Props) {
-  const hostRef = useRef<View>(null);
-  const handleRef = useRef<{ setBehavior: (b: Behavior) => void; dispose: () => void } | null>(null);
+export function LivingNuri({ behavior, stage, size = 320 }: Props) {
+  const [pose, setPose] = useState<Pose>('idle');
+  const [prevPose, setPrevPose] = useState<Pose>('idle');
+  const breath = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(1)).current;
+  const bob = useRef(new Animated.Value(0)).current;
+  const stageScale = 0.96 + stage * 0.02;
 
+  // always alive
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    let cancelled = false;
+    const a = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breath, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(breath, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const b = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bob, {
+          toValue: 1,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bob, {
+          toValue: 0,
+          duration: 2600,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    a.start();
+    b.start();
+    return () => {
+      a.stop();
+      b.stop();
+    };
+  }, [bob, breath]);
 
-    (async () => {
-      const { mountNuri3D } = await import('../nuri3d/mountNuri3D');
-      if (cancelled) return;
+  const switchPose = (next: Pose) => {
+    setPose((cur) => {
+      if (cur === next) return cur;
+      setPrevPose(cur);
+      fade.setValue(0);
+      Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      return next;
+    });
+  };
 
-      const canvas = document.createElement('canvas');
-      canvas.style.width = '100%';
-      canvas.style.height = '100%';
-      canvas.style.display = 'block';
-      canvas.style.borderRadius = '28px';
+  // behavior director
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
-      const node = hostRef.current as unknown as HTMLElement | null;
-      if (!node) return;
-      node.innerHTML = '';
-      node.appendChild(canvas);
+    if (behavior === 'sleepy') {
+      switchPose('sleepy');
+      return () => {
+        alive = false;
+      };
+    }
 
-      const handle = mountNuri3D(
-        canvas,
-        {
-          idle: uriOf(poseModules.idle),
-          sleepy: uriOf(poseModules.sleepy),
-          blink: uriOf(poseModules.blink),
-          wave: uriOf(poseModules.wave),
-          kick: uriOf(poseModules.kick),
-        },
-        behavior,
-      );
-      handleRef.current = handle;
-    })();
+    if (behavior === 'walk') {
+      switchPose('kick');
+      return () => {
+        alive = false;
+      };
+    }
+
+    if (behavior === 'screen') {
+      let closed = false;
+      switchPose('idle');
+      timer = setInterval(() => {
+        if (!alive) return;
+        closed = !closed;
+        switchPose(closed ? 'blink' : 'idle');
+      }, 240);
+      timeout = setTimeout(() => {
+        if (!alive) return;
+        clearInterval(timer);
+        switchPose('blink');
+      }, 1600);
+      return () => {
+        alive = false;
+        clearInterval(timer);
+        if (timeout) clearTimeout(timeout);
+      };
+    }
+
+    // idle life: blink + wave
+    switchPose('idle');
+    timer = setInterval(() => {
+      if (!alive) return;
+      switchPose('blink');
+      timeout = setTimeout(() => {
+        if (!alive) return;
+        switchPose('wave');
+        timeout = setTimeout(() => {
+          if (alive) switchPose('idle');
+        }, 900);
+      }, 160);
+    }, 4500);
 
     return () => {
-      cancelled = true;
-      handleRef.current?.dispose();
-      handleRef.current = null;
-      const node = hostRef.current as unknown as HTMLElement | null;
-      if (node) node.innerHTML = '';
+      alive = false;
+      clearInterval(timer);
+      if (timeout) clearTimeout(timeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    handleRef.current?.setBehavior(behavior);
   }, [behavior]);
 
-  if (Platform.OS !== 'web') {
-    return (
-      <View style={[styles.fallback, { width: size, height: size }]}>
-        <Image source={poseModules.idle} style={{ width: size, height: size, borderRadius: 28 }} />
-      </View>
-    );
-  }
+  const scale = breath.interpolate({
+    inputRange: [0, 1],
+    outputRange: [stageScale, stageScale * 1.025],
+  });
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
+  const rotate = bob.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-2deg', '2deg'],
+  });
 
-  return <View ref={hostRef} style={{ width: size, height: size }} />;
+  return (
+    <View style={{ width: size, height: size + 12, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        style={{
+          width: size,
+          height: size,
+          transform: [{ translateY }, { scale }, { rotate }],
+        }}
+      >
+        {/* previous pose under current for soft crossfade feel */}
+        <Image
+          source={poses[prevPose]}
+          style={[styles.img, { width: size, height: size, opacity: 0.35 }]}
+          resizeMode="cover"
+        />
+        <Animated.Image
+          source={poses[pose]}
+          style={[styles.img, { width: size, height: size, opacity: fade }]}
+          resizeMode="cover"
+        />
+      </Animated.View>
+      <View style={[styles.shadow, { width: size * 0.42 }]} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  fallback: { alignItems: 'center', justifyContent: 'center' },
+  img: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    borderRadius: 28,
+  },
+  shadow: {
+    height: 14,
+    borderRadius: 999,
+    backgroundColor: '#1a2430',
+    opacity: 0.28,
+    marginTop: 2,
+  },
 });

@@ -116,7 +116,7 @@ export function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <Text style={styles.brand}>Pulsepet</Text>
-            <Text style={styles.tagline}>Тот самый красивый Nuri с картинок — живой, в 3D-сцене.</Text>
+            <Text style={styles.tagline}>Красивый Nuri с картинок — живой и точно на экране.</Text>
           </View>
 
           <View style={styles.stage}>
