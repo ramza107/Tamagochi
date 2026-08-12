@@ -44,24 +44,23 @@ export function mountNuri3D(
   renderer.toneMappingExposure = 1.15;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#2B3138');
+  scene.background = new THREE.Color('#E8EEF2');
 
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 40);
-  camera.position.set(0, 0.2, 3.4);
-  camera.lookAt(0, 0.15, 0);
+  camera.position.set(0, 0.35, 3.6);
+  camera.lookAt(0, 0.25, 0);
 
-  scene.add(new THREE.HemisphereLight('#fff6e8', '#3a4a3c', 1.05));
-  const key = new THREE.DirectionalLight('#fff8ef', 1.35);
+  scene.add(new THREE.HemisphereLight('#ffffff', '#c5d0d8', 1.15));
+  const key = new THREE.DirectionalLight('#fff8ef', 1.25);
   key.position.set(1.8, 2.8, 2.4);
   scene.add(key);
-  const fill = new THREE.DirectionalLight('#b8d4ff', 0.45);
+  const fill = new THREE.DirectionalLight('#d0e4ff', 0.55);
   fill.position.set(-2.2, 1.2, 1.0);
   scene.add(fill);
-  const rim = new THREE.DirectionalLight('#ffb45a', 0.55);
+  const rim = new THREE.DirectionalLight('#ffc8b0', 0.4);
   rim.position.set(0.2, 1.0, -2.2);
   scene.add(rim);
-  // Warm bounce so amber frills / heart read clearly
-  const heartLight = new THREE.PointLight('#ff9a3a', 1.1, 4.5, 2);
+  const heartLight = new THREE.PointLight('#ff9a6a', 0.55, 4.5, 2);
   heartLight.position.set(0, 0.15, 0.6);
   scene.add(heartLight);
 

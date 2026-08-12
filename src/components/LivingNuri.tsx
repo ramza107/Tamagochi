@@ -4,7 +4,7 @@ import type { Behavior } from '../logic/behavior';
 import type { Equipped } from '../shop/catalog';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const idleCutout = require('../../assets/nuri3d/cutouts/idle.png');
+const idleCutout = require('../../assets/nuri3d/nuri_preview.png');
 
 type Props = {
   behavior: Behavior;
@@ -101,7 +101,7 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
         height: size,
         borderRadius: 28,
         overflow: 'hidden',
-        backgroundColor: '#2B3138',
+        backgroundColor: '#E8EEF2',
       }}
     >
       {/* Always-on beauty poster so stage is never empty */}

@@ -1,705 +1,422 @@
 """
-Build a cute polished realtime Nuri character (GLB) for Pulsepet.
-
-Soft mossy olive-green pear body, glassy amber eyes, axolotl leaf-frills,
-faceted amber heart gem, stubby limbs + toes, gentle smile + blush.
-Animations: breath, sway, blink lids, wave arm, heart pulse.
+Cute pastel baby-dragon Nuri matching the user reference:
+mint-blue body, peach belly/wings/horns, huge glossy teal eyes, sitting pose.
 """
-from __future__ import annotations
-
+import bpy
+import bmesh
 import math
 import os
-import sys
-
-import bpy
-from mathutils import Vector
 
 OUT_GLB = "/workspace/assets/nuri3d/nuri.glb"
-OUT_PNG = "/workspace/assets/nuri3d/nuri_preview.png"
-FPS = 30
-FRAME_END = 90
+OUT_PREVIEW = "/workspace/assets/nuri3d/nuri_preview.png"
 
-# Bright cute greens — NOT dark muddy
-BODY_COLOR = (0.48, 0.70, 0.36, 1.0)  # soft moss olive (bright)
-BELLY_COLOR = (0.62, 0.80, 0.48, 1.0)  # lighter belly
-AMBER = (1.0, 0.58, 0.12, 1.0)
-AMBER_EMIT = (1.0, 0.52, 0.08, 1.0)
-BLUSH = (0.95, 0.45, 0.55, 1.0)
-SCLERA = (0.99, 0.99, 0.97, 1.0)
-IRIS = (0.92, 0.50, 0.08, 1.0)
-PUPIL = (0.04, 0.03, 0.03, 1.0)
-MOUTH = (0.35, 0.22, 0.22, 1.0)
+bpy.ops.wm.read_factory_settings(use_empty=True)
+scene = bpy.context.scene
+scene.render.engine = "CYCLES"
+scene.cycles.samples = 32
+scene.cycles.use_denoising = True
+try:
+    scene.cycles.device = "CPU"
+except Exception:
+    pass
+scene.render.resolution_x = 900
+scene.render.resolution_y = 900
+scene.render.filepath = OUT_PREVIEW
+scene.render.image_settings.file_format = "PNG"
+scene.render.film_transparent = True
+scene.render.fps = 30
+scene.frame_start = 1
+scene.frame_end = 120
 
+# palette from reference
+MINT = (0.62, 0.88, 0.92)
+MINT_DEEP = (0.42, 0.74, 0.82)
+PEACH = (0.99, 0.68, 0.58)
+PEACH_SOFT = (1.0, 0.8, 0.72)
+TEAL_EYE = (0.12, 0.58, 0.66)
+CRYSTAL = (0.6, 0.9, 0.98)
+BLUSH = (1.0, 0.5, 0.55)
 
-def clear_scene() -> None:
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    scene = bpy.context.scene
-    scene.render.fps = FPS
-    scene.frame_start = 1
-    scene.frame_end = FRAME_END
-    scene.render.resolution_x = 768
-    scene.render.resolution_y = 768
-    scene.render.film_transparent = True
-    # Prefer EEVEE for accurate amber emission color in preview
-    try:
-        scene.render.engine = "BLENDER_EEVEE_NEXT"
-    except Exception:
-        try:
-            scene.render.engine = "BLENDER_EEVEE"
-        except Exception:
-            scene.render.engine = "CYCLES"
-            scene.cycles.samples = 64
+def new_mat(name):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+    nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    return m, bsdf
 
+def paint(bsdf, rgb, roughness=0.45, metallic=0.0, emit=None, emit_s=0.0):
+    bsdf.inputs["Base Color"].default_value = (*rgb, 1)
+    bsdf.inputs["Roughness"].default_value = roughness
+    bsdf.inputs["Metallic"].default_value = metallic
+    if emit is not None and "Emission Color" in bsdf.inputs:
+        bsdf.inputs["Emission Color"].default_value = (*emit, 1)
+        bsdf.inputs["Emission Strength"].default_value = emit_s
+    if "Specular IOR Level" in bsdf.inputs:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.45
+    if "Coat Weight" in bsdf.inputs and roughness < 0.25:
+        bsdf.inputs["Coat Weight"].default_value = 0.7
+        bsdf.inputs["Coat Roughness"].default_value = 0.08
 
-def principled(name: str, **kwargs) -> bpy.types.Material:
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    links = mat.node_tree.links
-    nodes.clear()
-    out = nodes.new("ShaderNodeOutputMaterial")
-    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.location = (0, 0)
-    out.location = (280, 0)
+def soft_skin(name, rgb, roughness=0.55):
+    m, bsdf = new_mat(name)
+    paint(bsdf, rgb, roughness=roughness)
+    # subtle subsurface-ish via sheen
+    if "Sheen Weight" in bsdf.inputs:
+        bsdf.inputs["Sheen Weight"].default_value = 0.25
+    return m
 
-    def set_in(key: str, value) -> None:
-        if key in bsdf.inputs:
-            bsdf.inputs[key].default_value = value
+mat_body = soft_skin("BodyMint", MINT, 0.58)
+mat_deep = soft_skin("BodyDeep", MINT_DEEP, 0.62)
+mat_peach = soft_skin("Peach", PEACH, 0.5)
+mat_peach_soft = soft_skin("PeachSoft", PEACH_SOFT, 0.48)
+mat_crystal, c_bsdf = new_mat("Crystal")
+paint(c_bsdf, CRYSTAL, roughness=0.12, metallic=0.15, emit=CRYSTAL, emit_s=0.8)
+if "Transmission Weight" in c_bsdf.inputs:
+    c_bsdf.inputs["Transmission Weight"].default_value = 0.35
+mat_eye_w, ew = new_mat("EyeWhite")
+paint(ew, (0.98, 0.99, 1.0), roughness=0.12)
+mat_iris, ir = new_mat("Iris")
+paint(ir, TEAL_EYE, roughness=0.22, emit=(0.1, 0.4, 0.45), emit_s=0.25)
+mat_pupil, pu = new_mat("Pupil")
+paint(pu, (0.05, 0.08, 0.1), roughness=0.35)
+mat_shine, sh = new_mat("Shine")
+paint(sh, (1, 1, 1), roughness=0.05, emit=(1, 1, 1), emit_s=0.5)
+mat_lash, la = new_mat("Lash")
+paint(la, (0.12, 0.18, 0.22), roughness=0.6)
+mat_blush, bl = new_mat("Blush")
+paint(bl, BLUSH, roughness=0.7, emit=BLUSH, emit_s=0.15)
+if "Alpha" in bl.inputs:
+    bl.inputs["Alpha"].default_value = 0.45
+mat_blush.blend_method = "BLEND"
+mat_mouth, mo = new_mat("Mouth")
+paint(mo, (0.55, 0.28, 0.32), roughness=0.55)
 
-    if "base" in kwargs:
-        set_in("Base Color", kwargs["base"])
-    if "rough" in kwargs:
-        set_in("Roughness", kwargs["rough"])
-    if "metal" in kwargs:
-        set_in("Metallic", kwargs["metal"])
-    if "spec" in kwargs:
-        # Blender 4 uses Specular IOR Level
-        if "Specular IOR Level" in bsdf.inputs:
-            set_in("Specular IOR Level", kwargs["spec"])
-        elif "Specular" in bsdf.inputs:
-            set_in("Specular", kwargs["spec"])
-    if "alpha" in kwargs:
-        set_in("Alpha", kwargs["alpha"])
-        mat.blend_method = "BLEND"
-        if hasattr(mat, "shadow_method"):
-            mat.shadow_method = "HASHED"
-    if "transmission" in kwargs:
-        if "Transmission Weight" in bsdf.inputs:
-            set_in("Transmission Weight", kwargs["transmission"])
-        elif "Transmission" in bsdf.inputs:
-            set_in("Transmission", kwargs["transmission"])
-    if "ior" in kwargs:
-        set_in("IOR", kwargs["ior"])
-    if "emit" in kwargs:
-        color, strength = kwargs["emit"]
-        if "Emission Color" in bsdf.inputs:
-            set_in("Emission Color", color)
-            set_in("Emission Strength", strength)
-        elif "Emission" in bsdf.inputs:
-            set_in("Emission", color)
-            # older blender strength separate sometimes
-    if "coat" in kwargs:
-        if "Coat Weight" in bsdf.inputs:
-            set_in("Coat Weight", kwargs["coat"])
-            set_in("Coat Roughness", kwargs.get("coat_rough", 0.2))
-
-    links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
-    return mat
-
-
-def shade_smooth(obj: bpy.types.Object) -> None:
+def smooth(obj):
     bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
     bpy.ops.object.shade_smooth()
-    for poly in obj.data.polygons:
-        poly.use_smooth = True
-    obj.select_set(False)
 
+def parent(o, p):
+    o.parent = p
 
-def apply_subsurf(obj: bpy.types.Object, levels: int = 2) -> None:
-    mod = obj.modifiers.new("Subsurf", "SUBSURF")
-    mod.levels = levels
-    mod.render_levels = levels
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier="Subsurf")
-
-
-def make_uv_sphere(name: str, radius: float, location, segments=32, rings=16) -> bpy.types.Object:
-    bpy.ops.mesh.primitive_uv_sphere_add(
-        radius=radius, location=location, segments=segments, ring_count=rings
-    )
-    obj = bpy.context.object
-    obj.name = name
-    shade_smooth(obj)
-    return obj
-
-
-def make_ico(name: str, radius: float, location, subdivisions=2) -> bpy.types.Object:
-    bpy.ops.mesh.primitive_ico_sphere_add(
-        radius=radius, location=location, subdivisions=subdivisions
-    )
-    obj = bpy.context.object
-    obj.name = name
-    shade_smooth(obj)
-    return obj
-
-
-def squash(obj: bpy.types.Object, sx=1.0, sy=1.0, sz=1.0) -> None:
-    obj.scale = (sx, sy, sz)
+def apply_scale(o):
+    bpy.context.view_layer.objects.active = o
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
+def sphere(name, loc, scale, mat, seg=48, ring=32):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=ring, radius=1, location=loc)
+    o = bpy.context.object
+    o.name = name
+    o.scale = scale
+    apply_scale(o)
+    o.data.materials.append(mat)
+    smooth(o)
+    return o
 
-def parent(child: bpy.types.Object, parent_obj: bpy.types.Object) -> None:
-    child.parent = parent_obj
+def cone(name, loc, scale, mat, verts=16):
+    bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=1, radius2=0.05, depth=2, location=loc)
+    o = bpy.context.object
+    o.name = name
+    o.scale = scale
+    apply_scale(o)
+    o.data.materials.append(mat)
+    smooth(o)
+    return o
 
+# --- hierarchy ---
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0, 0, 0))
+root = bpy.context.object
+root.name = "NuriRoot"
 
-def key_scale(obj, fr, s):
-    obj.scale = s
-    obj.keyframe_insert("scale", frame=fr)
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0, 0, 0.55))
+body_pivot = bpy.context.object
+body_pivot.name = "BodyPivot"
+parent(body_pivot, root)
 
+# sitting pear body — chibi: big head
+belly = sphere("Belly", (0, 0.05, -0.15), (0.7, 0.65, 0.58), mat_body, 64, 48)
+tummy = sphere("Tummy", (0, 0.42, -0.18), (0.45, 0.26, 0.48), mat_peach, 48, 32)
+for i, z in enumerate([-0.32, -0.15, 0.02]):
+    plate = sphere(f"Plate{i}", (0, 0.55, z), (0.36 - i * 0.02, 0.07, 0.09), mat_peach_soft, 24, 16)
+    parent(plate, body_pivot)
+head = sphere("Head", (0, 0.12, 0.95), (0.88, 0.8, 0.82), mat_body, 64, 48)
+cheek_l = sphere("CheekL", (-0.55, 0.5, 0.82), (0.24, 0.18, 0.2), mat_body, 24, 16)
+cheek_r = sphere("CheekR", (0.55, 0.5, 0.82), (0.24, 0.18, 0.2), mat_body, 24, 16)
+for o in (belly, tummy, head, cheek_l, cheek_r):
+    parent(o, body_pivot)
 
+# blush
+blush_l = sphere("BlushL", (-0.4, 0.55, 0.62), (0.12, 0.04, 0.08), mat_blush, 16, 12)
+blush_r = sphere("BlushR", (0.4, 0.55, 0.62), (0.12, 0.04, 0.08), mat_blush, 16, 12)
+parent(blush_l, body_pivot)
+parent(blush_r, body_pivot)
+
+# horns (peach) — clearly on top
+horn_l = cone("HornL", (-0.28, 0.05, 1.65), (0.1, 0.1, 0.22), mat_peach, 12)
+horn_r = cone("HornR", (0.28, 0.05, 1.65), (0.1, 0.1, 0.22), mat_peach, 12)
+horn_l.rotation_euler = (math.radians(-18), math.radians(-18), 0)
+horn_r.rotation_euler = (math.radians(-18), math.radians(18), 0)
+parent(horn_l, body_pivot)
+parent(horn_r, body_pivot)
+
+# fin ears
+ear_l = sphere("EarL", (-0.7, 0.05, 1.05), (0.22, 0.1, 0.32), mat_body, 24, 16)
+ear_r = sphere("EarR", (0.7, 0.05, 1.05), (0.22, 0.1, 0.32), mat_body, 24, 16)
+ear_l.rotation_euler.z = math.radians(25)
+ear_r.rotation_euler.z = math.radians(-25)
+inner_l = sphere("EarInnerL", (-0.72, 0.12, 1.05), (0.14, 0.05, 0.22), mat_peach, 16, 12)
+inner_r = sphere("EarInnerR", (0.72, 0.12, 1.05), (0.14, 0.05, 0.22), mat_peach, 16, 12)
+for o in (ear_l, ear_r, inner_l, inner_r):
+    parent(o, body_pivot)
+
+# forehead crystals
+for i, x in enumerate([-0.12, 0.0, 0.12]):
+    gem = cone(f"ForeGem{i}", (x, 0.55, 1.28), (0.05, 0.05, 0.09), mat_crystal, 6)
+    gem.rotation_euler.x = math.radians(20)
+    parent(gem, body_pivot)
+
+# huge eyes
+def make_eye(side, x):
+    g = bpy.data.objects.new(f"Eye{side}", None)
+    bpy.context.collection.objects.link(g)
+    g.empty_display_type = "PLAIN_AXES"
+    g.location = (x, 0.7, 1.0)
+    parent(g, body_pivot)
+    white = sphere(f"Eye{side}W", (0, 0, 0), (0.3, 0.24, 0.28), mat_eye_w, 32, 24)
+    iris = sphere(f"Eye{side}I", (0, 0.12, -0.02), (0.18, 0.15, 0.17), mat_iris, 28, 20)
+    pup = sphere(f"Eye{side}P", (0, 0.2, -0.02), (0.09, 0.08, 0.08), mat_pupil, 16, 12)
+    shine = sphere(f"Eye{side}S", (0.08, 0.26, 0.07), (0.06, 0.05, 0.05), mat_shine, 12, 8)
+    shine2 = sphere(f"Eye{side}S2", (-0.06, 0.22, -0.04), (0.025, 0.02, 0.02), mat_shine, 10, 8)
+    for i, (lx, lz) in enumerate([(-0.14, 0.2), (-0.02, 0.26), (0.12, 0.2)]):
+        lash = sphere(f"Lash{side}{i}", (lx, 0.14, lz), (0.018, 0.012, 0.07), mat_lash, 8, 6)
+        parent(lash, g)
+    for o in (white, iris, pup, shine, shine2):
+        parent(o, g)
+    return g
+
+eye_l = make_eye("L", -0.34)
+eye_r = make_eye("R", 0.34)
+
+# lids for blink
+lid_l = sphere("LidL", (-0.34, 0.72, 1.2), (0.32, 0.12, 0.16), mat_body, 24, 16)
+lid_r = sphere("LidR", (0.34, 0.72, 1.2), (0.32, 0.12, 0.16), mat_body, 24, 16)
+parent(lid_l, body_pivot)
+parent(lid_r, body_pivot)
+
+# soft smile
+bpy.ops.mesh.primitive_torus_add(major_radius=0.12, minor_radius=0.018, location=(0, 0.68, 0.58))
+mouth = bpy.context.object
+mouth.name = "Mouth"
+mouth.rotation_euler = (math.radians(100), 0, 0)
+mouth.scale = (1.0, 0.4, 1.0)
+apply_scale(mouth)
+bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+mouth.data.materials.append(mat_mouth)
+parent(mouth, body_pivot)
+
+# snout tip
+snout = sphere("Snout", (0, 0.72, 0.7), (0.16, 0.12, 0.1), mat_peach_soft, 24, 16)
+parent(snout, body_pivot)
+
+# arms (paws together cute pose)
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(-0.28, 0.35, 0.15))
+arm_l = bpy.context.object
+arm_l.name = "ArmL"
+parent(arm_l, root)
+al = sphere("ArmLMesh", (0, 0, 0), (0.16, 0.18, 0.28), mat_body, 24, 16)
+paw_l = sphere("PawL", (0.08, 0.12, -0.28), (0.14, 0.12, 0.12), mat_peach, 16, 12)
+parent(al, arm_l)
+parent(paw_l, arm_l)
+
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0.28, 0.35, 0.15))
+arm_r = bpy.context.object
+arm_r.name = "ArmR"
+parent(arm_r, root)
+ar = sphere("ArmRMesh", (0, 0, 0), (0.16, 0.18, 0.28), mat_body, 24, 16)
+paw_r = sphere("PawR", (-0.08, 0.12, -0.28), (0.14, 0.12, 0.12), mat_peach, 16, 12)
+parent(ar, arm_r)
+parent(paw_r, arm_r)
+# slight inward rotation so paws meet
+arm_l.rotation_euler = (math.radians(25), 0, math.radians(18))
+arm_r.rotation_euler = (math.radians(25), 0, math.radians(-18))
+
+# feet sitting
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(-0.32, 0.25, -0.55))
+foot_l = bpy.context.object
+foot_l.name = "FootL"
+parent(foot_l, root)
+fl = sphere("FootLMesh", (0, 0, 0), (0.22, 0.28, 0.14), mat_body, 20, 12)
+parent(fl, foot_l)
+for i in range(3):
+    claw = sphere(f"ClawL{i}", ((i - 1) * 0.08, 0.22, -0.02), (0.04, 0.06, 0.035), mat_peach, 10, 8)
+    parent(claw, foot_l)
+
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0.32, 0.25, -0.55))
+foot_r = bpy.context.object
+foot_r.name = "FootR"
+parent(foot_r, root)
+fr = sphere("FootRMesh", (0, 0, 0), (0.22, 0.28, 0.14), mat_body, 20, 12)
+parent(fr, foot_r)
+for i in range(3):
+    claw = sphere(f"ClawR{i}", ((i - 1) * 0.08, 0.22, -0.02), (0.04, 0.06, 0.035), mat_peach, 10, 8)
+    parent(claw, foot_r)
+
+# tiny wings
+def make_wing(side, x):
+    g = bpy.data.objects.new(f"Wing{side}", None)
+    bpy.context.collection.objects.link(g)
+    g.empty_display_type = "PLAIN_AXES"
+    g.location = (x, -0.05, 0.4)
+    parent(g, body_pivot)
+    bone = sphere(f"WingBone{side}", (0.22 * (1 if x > 0 else -1), 0, 0.15), (0.07, 0.06, 0.28), mat_deep, 12, 8)
+    membrane = sphere(f"WingMem{side}", (0.42 * (1 if x > 0 else -1), 0.08, 0.02), (0.32, 0.05, 0.36), mat_peach, 16, 12)
+    tip = sphere(f"WingTip{side}", (0.55 * (1 if x > 0 else -1), 0.05, 0.25), (0.08, 0.05, 0.1), mat_deep, 12, 8)
+    parent(bone, g)
+    parent(membrane, g)
+    parent(tip, g)
+    g.rotation_euler = (math.radians(-15), math.radians(30 if x > 0 else -30), math.radians(25 if x > 0 else -25))
+    return g
+
+wing_l = make_wing("L", -0.55)
+wing_r = make_wing("R", 0.55)
+
+# curly tail
+bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0.35, -0.35, -0.35))
+tail = bpy.context.object
+tail.name = "Tail"
+parent(tail, root)
+t0 = sphere("Tail0", (0, 0, 0), (0.18, 0.18, 0.18), mat_body, 20, 12)
+t1 = sphere("Tail1", (0.18, -0.12, 0.05), (0.15, 0.15, 0.15), mat_body, 16, 12)
+t2 = sphere("Tail2", (0.32, -0.05, 0.12), (0.12, 0.12, 0.12), mat_body, 16, 12)
+t3 = sphere("Tail3", (0.38, 0.12, 0.18), (0.1, 0.1, 0.1), mat_body, 14, 10)
+for o in (t0, t1, t2, t3):
+    parent(o, tail)
+for i, (lx, ly, lz) in enumerate([(0.1, -0.05, 0.12), (0.25, -0.08, 0.16), (0.35, 0.0, 0.22)]):
+    spike = cone(f"TailSpike{i}", (lx, ly, lz), (0.04, 0.04, 0.08), mat_crystal, 5)
+    spike.rotation_euler.x = math.radians(-40)
+    parent(spike, tail)
+
+# ankle crystals from reference
+for side, x in (("L", -0.32), ("R", 0.32)):
+    for i in range(2):
+        gem = cone(f"AnkleGem{side}{i}", (x + (i - 0.5) * 0.08, 0.35, -0.4), (0.035, 0.035, 0.07), mat_crystal, 5)
+        gem.rotation_euler.x = math.radians(30)
+        parent(gem, root)
+
+# walk pebble (hidden unless walk)
+pebble = sphere("Pebble", (0.7, 0.4, -0.55), (0.08, 0.07, 0.06), soft_skin("PebbleMat", (0.5, 0.48, 0.45), 0.95), 12, 8)
+parent(pebble, root)
+
+# --- animations ---
 def key_rot(obj, fr, e):
     obj.rotation_euler = e
     obj.keyframe_insert("rotation_euler", frame=fr)
-
 
 def key_loc(obj, fr, loc):
     obj.location = loc
     obj.keyframe_insert("location", frame=fr)
 
-
-def make_leaf_frill(name: str, side: float, index: int, mats: dict) -> bpy.types.Object:
-    """Translucent glowing amber leaf-frill (axolotl style)."""
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, radius=0.14, location=(0, 0, 0))
-    leaf = bpy.context.object
-    leaf.name = name
-    squash(leaf, 0.5, 0.16, 1.45)
-    mesh = leaf.data
-    for v in mesh.vertices:
-        x, y, z = float(v.co.x), float(v.co.y), float(v.co.z)
-        t = max(0.0, min(1.0, (z + 0.18) / 0.36))
-        v.co = Vector((x * (1.0 - 0.6 * t), y * (1.0 - 0.3 * t), z * 1.08))
-    shade_smooth(leaf)
-    leaf.data.materials.append(mats["amber_frill"])
-
-    # Fan around head: 3 per side — more outward so amber reads clearly
-    elev = [0.86, 0.68, 0.50]
-    out = 0.58 + index * 0.03
-    z = elev[index]
-    y = -0.12
-    x = side * out
-    leaf.location = (x, y, z)
-    leaf.rotation_euler = (
-        math.radians(8 + index * 10),
-        math.radians(side * (35 + index * 12)),
-        math.radians(side * (25 + index * 8)),
-    )
-    s = 1.15 - index * 0.1
-    leaf.scale = (s, s * 0.95, s * (1.15 - index * 0.06))
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    return leaf
-
-
-def make_heart(name: str, mats: dict) -> bpy.types.Object:
-    """Faceted glowing amber heart gem on chest."""
-    # Heart outline via two lobes + pointed tip, then decimate for facets
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=0.07, location=(-0.045, 0, 0.04))
-    a = bpy.context.object
-    a.name = name + "_A"
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=0.07, location=(0.045, 0, 0.04))
-    b = bpy.context.object
-    b.name = name + "_B"
-    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.085, radius2=0.0, depth=0.14, location=(0, 0, -0.06))
-    c = bpy.context.object
-    c.name = name + "_C"
-    c.rotation_euler = (math.radians(180), 0, 0)
-
-    for o in (a, b, c):
-        o.select_set(True)
-    bpy.context.view_layer.objects.active = a
-    bpy.ops.object.join()
-    heart = bpy.context.object
-    heart.name = name
-
-    # Boolean-ish merge via voxel remesh then slight decimate for facets
-    rem = heart.modifiers.new("Remesh", "REMESH")
-    rem.mode = "VOXEL"
-    rem.voxel_size = 0.018
-    bpy.ops.object.modifier_apply(modifier="Remesh")
-    dec = heart.modifiers.new("Decimate", "DECIMATE")
-    dec.decimate_type = "DISSOLVE"
-    dec.angle_limit = math.radians(12)
-    bpy.ops.object.modifier_apply(modifier="Decimate")
-
-    for poly in heart.data.polygons:
-        poly.use_smooth = False
-
-    heart.data.materials.append(mats["amber_gem"])
-    bpy.context.view_layer.objects.active = heart
-    heart.select_set(True)
-    bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
-    heart.location = (0.0, -0.55, 0.2)
-    heart.scale = (1.55, 0.85, 1.55)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    heart.rotation_euler = (math.radians(6), 0, 0)
-    return heart
-
-
-def make_eye(name: str, side: float, mats: dict) -> tuple:
-    """Big glassy eye with amber iris + highlights. Returns (group empty, lid)."""
-    bpy.ops.object.empty_add(type="PLAIN_AXES", location=(side * 0.24, -0.52, 0.74))
-    eye_root = bpy.context.object
-    eye_root.name = name
-
-    # sclera / eyeball — slightly flattened toward camera (-Y)
-    ball = make_uv_sphere(f"{name}_Ball", 0.145, (0, 0, 0), segments=28, rings=16)
-    squash(ball, 1.08, 0.78, 1.12)
-    ball.data.materials.append(mats["sclera"])
-    parent(ball, eye_root)
-
-    # Amber iris as a front-facing disc — sit ON the sclera surface
-    bpy.ops.mesh.primitive_cylinder_add(vertices=28, radius=0.085, depth=0.025, location=(0, -0.12, 0.012))
-    iris = bpy.context.object
-    iris.name = f"{name}_Iris"
-    iris.rotation_euler = (math.radians(90), 0, 0)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    shade_smooth(iris)
-    iris.data.materials.append(mats["iris"])
-    parent(iris, eye_root)
-
-    # pupil disc
-    bpy.ops.mesh.primitive_cylinder_add(vertices=20, radius=0.04, depth=0.022, location=(0, -0.135, 0.018))
-    pupil = bpy.context.object
-    pupil.name = f"{name}_Pupil"
-    pupil.rotation_euler = (math.radians(90), 0, 0)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    shade_smooth(pupil)
-    pupil.data.materials.append(mats["pupil"])
-    parent(pupil, eye_root)
-
-    # highlight sparkles on front
-    hi1 = make_uv_sphere(f"{name}_Hi1", 0.032, (0.045, -0.15, 0.055), segments=12, rings=8)
-    hi1.data.materials.append(mats["highlight"])
-    parent(hi1, eye_root)
-    hi2 = make_uv_sphere(f"{name}_Hi2", 0.016, (-0.04, -0.145, 0.008), segments=10, rings=6)
-    hi2.data.materials.append(mats["highlight"])
-    parent(hi2, eye_root)
-
-    # soft eyelid (blink) — nearly invisible when open
-    lid = make_uv_sphere(f"{name}_Lid", 0.155, (0, -0.06, 0.02), segments=24, rings=12)
-    squash(lid, 1.15, 0.7, 0.55)
-    shade_smooth(lid)
-    lid.data.materials.append(mats["lid"])
-    # Open: collapse so eyes stay fully visible
-    lid.scale = (0.01, 0.01, 0.01)
-    lid.location = (0, -0.06, 0.16)
-    parent(lid, eye_root)
-
-    return eye_root, lid
-
-
-def make_arm(name: str, side: float, mats: dict) -> tuple:
-    bpy.ops.object.empty_add(type="PLAIN_AXES", location=(side * 0.55, -0.05, 0.18))
-    arm_root = bpy.context.object
-    arm_root.name = name
-
-    # stubby upper
-    arm = make_uv_sphere(f"{name}_Mesh", 0.14, (side * 0.08, 0.0, -0.05), segments=20, rings=12)
-    squash(arm, 0.75, 0.7, 1.15)
-    arm.data.materials.append(mats["body"])
-    parent(arm, arm_root)
-
-    # hand / toes
-    hand = make_uv_sphere(f"{name}_Hand", 0.09, (side * 0.12, -0.02, -0.22), segments=16, rings=10)
-    squash(hand, 1.1, 0.85, 0.7)
-    hand.data.materials.append(mats["body"])
-    parent(hand, arm_root)
-
-    for i, ox in enumerate([-0.05, 0.0, 0.05]):
-        toe = make_uv_sphere(f"{name}_Toe{i}", 0.028, (side * 0.12 + ox, -0.06, -0.28), segments=10, rings=6)
-        squash(toe, 0.9, 1.1, 0.7)
-        toe.data.materials.append(mats["body"])
-        parent(toe, arm_root)
-
-    return arm_root, arm
-
-
-def make_foot(name: str, side: float, mats: dict) -> bpy.types.Object:
-    bpy.ops.object.empty_add(type="PLAIN_AXES", location=(side * 0.22, 0.02, -0.72))
-    foot_root = bpy.context.object
-    foot_root.name = name
-
-    foot = make_uv_sphere(f"{name}_Mesh", 0.13, (0, -0.04, 0.0), segments=18, rings=10)
-    squash(foot, 1.15, 1.35, 0.55)
-    foot.data.materials.append(mats["body"])
-    parent(foot, foot_root)
-
-    for i, ox in enumerate([-0.055, 0.0, 0.055]):
-        toe = make_uv_sphere(f"{name}_Toe{i}", 0.032, (ox, -0.14, -0.02), segments=10, rings=6)
-        squash(toe, 0.85, 1.15, 0.7)
-        toe.data.materials.append(mats["body"])
-        parent(toe, foot_root)
-
-    return foot_root
-
-
-def build_character() -> dict:
-    mats = {
-        "body": principled(
-            "NuriBody",
-            base=BODY_COLOR,
-            rough=0.72,
-            spec=0.35,
-            coat=0.15,
-            coat_rough=0.45,
-        ),
-        "belly": principled("NuriBelly", base=BELLY_COLOR, rough=0.68, spec=0.3),
-        # Solid emissive amber — modest strength so color stays saturated (not white blowout)
-        "amber_frill": principled(
-            "AmberFrill",
-            base=(1.0, 0.55, 0.1, 1.0),
-            rough=0.28,
-            transmission=0.0,
-            emit=((1.0, 0.45, 0.05, 1.0), 1.8),
-            coat=0.35,
-            coat_rough=0.2,
-        ),
-        "amber_gem": principled(
-            "AmberHeart",
-            base=(1.0, 0.48, 0.06, 1.0),
-            rough=0.15,
-            metal=0.2,
-            transmission=0.0,
-            emit=((1.0, 0.4, 0.04, 1.0), 2.4),
-            coat=0.55,
-            coat_rough=0.08,
-        ),
-        "sclera": principled("Sclera", base=SCLERA, rough=0.15, coat=0.55, coat_rough=0.1),
-        "iris": principled(
-            "Iris",
-            base=(0.95, 0.42, 0.05, 1.0),
-            rough=0.3,
-            emit=((1.0, 0.45, 0.06, 1.0), 0.9),
-        ),
-        "pupil": principled("Pupil", base=PUPIL, rough=0.4),
-        "highlight": principled(
-            "Highlight",
-            base=(1, 1, 1, 1),
-            rough=0.05,
-            emit=((1, 1, 1, 1), 3.0),
-        ),
-        "blush": principled("Blush", base=BLUSH, rough=0.7, alpha=0.55, emit=(BLUSH, 0.15)),
-        "mouth": principled("Mouth", base=MOUTH, rough=0.55),
-        "lid": principled("Lid", base=BODY_COLOR, rough=0.72, spec=0.35),
-    }
-
-    bpy.ops.object.empty_add(type="PLAIN_AXES", location=(0, 0, 0))
-    root = bpy.context.object
-    root.name = "NuriRoot"
-
-    # --- Pear body (scaled UV sphere + soft top) ---
-    body = make_uv_sphere("NuriBody", 0.62, (0, 0, 0.05), segments=40, rings=24)
-    # pear: wider bottom, narrower top
-    for v in body.data.vertices:
-        x, y, z = float(v.co.x), float(v.co.y), float(v.co.z)
-        t = max(0.0, min(1.0, (z + 0.62) / 1.24))  # 0 bottom -> 1 top
-        widen = float(1.15 - 0.35 * (t ** 1.4))
-        nx = x * widen * 0.92
-        ny = y * widen
-        if ny < 0:
-            ny *= 1.0 + 0.12 * (1.0 - t)
-        nz = z * 1.08
-        v.co = Vector((nx, ny, nz))
-    shade_smooth(body)
-    apply_subsurf(body, 1)
-    body.data.materials.append(mats["body"])
-    parent(body, root)
-
-    # soft belly patch (keep behind heart gem)
-    belly = make_uv_sphere("NuriBelly", 0.36, (0, -0.22, -0.08), segments=28, rings=16)
-    squash(belly, 0.95, 0.45, 1.1)
-    belly.data.materials.append(mats["belly"])
-    parent(belly, root)
-
-    # head bump (slightly separate for cute round head)
-    head = make_uv_sphere("NuriHead", 0.48, (0, -0.05, 0.62), segments=36, rings=20)
-    squash(head, 1.05, 0.95, 0.95)
-    head.data.materials.append(mats["body"])
-    parent(head, root)
-
-    # brows (tiny indent ridges)
-    for side in (-1, 1):
-        brow = make_uv_sphere(f"Brow_{side}", 0.04, (side * 0.18, -0.42, 0.88), segments=12, rings=8)
-        squash(brow, 1.6, 0.5, 0.35)
-        brow.rotation_euler = (0, 0, math.radians(side * -12))
-        brow.data.materials.append(mats["body"])
-        parent(brow, root)
-
-    # blush
-    for side in (-1, 1):
-        blush = make_uv_sphere(f"Blush_{side}", 0.07, (side * 0.32, -0.4, 0.58), segments=14, rings=8)
-        squash(blush, 1.3, 0.4, 0.7)
-        blush.data.materials.append(mats["blush"])
-        parent(blush, root)
-
-    # gentle smile — small curved tube from bezier
-    curve = bpy.data.curves.new("SmileCurve", type="CURVE")
-    curve.dimensions = "3D"
-    curve.bevel_depth = 0.011
-    curve.bevel_resolution = 3
-    curve.resolution_u = 16
-    spline = curve.splines.new("BEZIER")
-    spline.bezier_points.add(2)
-    pts = [
-        (-0.09, -0.50, 0.545),
-        (0.0, -0.52, 0.515),
-        (0.09, -0.50, 0.545),
-    ]
-    for bp, p in zip(spline.bezier_points, pts):
-        bp.co = Vector(p)
-        bp.handle_left_type = "AUTO"
-        bp.handle_right_type = "AUTO"
-    smile = bpy.data.objects.new("Smile", curve)
-    bpy.context.collection.objects.link(smile)
-    # convert to mesh for glTF
-    bpy.context.view_layer.objects.active = smile
-    smile.select_set(True)
-    bpy.ops.object.convert(target="MESH")
-    smile = bpy.context.object
-    smile.name = "Smile"
-    smile.data.materials.append(mats["mouth"])
-    parent(smile, root)
-
-    # eyes
-    eye_L, lid_L = make_eye("Eye_L", -1, mats)
-    eye_R, lid_R = make_eye("Eye_R", 1, mats)
-    parent(eye_L, root)
-    parent(eye_R, root)
-
-    # frills 3 per side
-    frills = []
-    for side in (-1, 1):
-        for i in range(3):
-            leaf = make_leaf_frill(f"Frill_{'L' if side < 0 else 'R'}{i}", side, i, mats)
-            parent(leaf, root)
-            frills.append(leaf)
-
-    # heart gem
-    heart = make_heart("HeartGem", mats)
-    parent(heart, root)
-
-    # arms
-    arm_L, _ = make_arm("Arm_L", -1, mats)
-    arm_R, _ = make_arm("Arm_R", 1, mats)
-    parent(arm_L, root)
-    parent(arm_R, root)
-
-    # feet
-    foot_L = make_foot("Foot_L", -1, mats)
-    foot_R = make_foot("Foot_R", 1, mats)
-    parent(foot_L, root)
-    parent(foot_R, root)
-
-    # walk pebble (optional scene prop, also in GLB)
-    pebble = make_ico("Pebble", 0.07, (0.7, -0.2, -0.85), subdivisions=1)
-    pm = principled("Pebble", base=(0.55, 0.52, 0.48, 1), rough=0.95)
-    pebble.data.materials.append(pm)
-    parent(pebble, root)
-
-    return {
-        "root": root,
-        "body": body,
-        "head": head,
-        "heart": heart,
-        "arm_L": arm_L,
-        "arm_R": arm_R,
-        "lid_L": lid_L,
-        "lid_R": lid_R,
-        "frills": frills,
-        "pebble": pebble,
-        "mats": mats,
-    }
-
-
-def animate(parts: dict) -> None:
-    root = parts["root"]
-    heart = parts["heart"]
-    arm_R = parts["arm_R"]
-    lid_L = parts["lid_L"]
-    lid_R = parts["lid_R"]
-    frills = parts["frills"]
-
-    # Clear existing
-    for obj in bpy.data.objects:
-        if obj.animation_data:
-            obj.animation_data_clear()
-
-    # Breath + sway on root (scale Z + rotate Y)
-    for fr, z, ry, y in [
-        (1, 1.0, -0.08, 0.0),
-        (23, 1.035, 0.0, 0.02),
-        (45, 1.0, 0.08, 0.0),
-        (68, 1.03, 0.0, 0.018),
-        (90, 1.0, -0.08, 0.0),
-    ]:
-        key_scale(root, fr, (1.0, 1.0, z))
-        key_rot(root, fr, (0.0, ry, 0.0))
-        key_loc(root, fr, (0.0, 0.0, y))
-
-    # Heart pulse
-    for fr, s in [(1, 1.0), (15, 1.12), (30, 1.0), (45, 1.1), (60, 1.0), (75, 1.12), (90, 1.0)]:
-        key_scale(heart, fr, (s, s, s))
-
-    # Frill gentle shimmer scale
-    for i, leaf in enumerate(frills):
-        phase = i * 5
-        for fr, s in [
-            (1 + phase, 1.0),
-            (20 + phase, 1.06),
-            (40 + phase, 1.0),
-            (60 + phase, 1.05),
-            (90, 1.0),
-        ]:
-            f = min(FRAME_END, max(1, fr))
-            key_scale(leaf, f, (s, s, s))
-
-    # Blink lids (quick close around frames 50-56 and 80-86)
-    def blink(lid, frames_close):
-        key_loc(lid, 1, (0, -0.06, 0.16))
-        key_scale(lid, 1, (0.01, 0.01, 0.01))
-        for start in frames_close:
-            key_loc(lid, start, (0, -0.06, 0.16))
-            key_scale(lid, start, (0.01, 0.01, 0.01))
-            # closed: cover eye
-            key_loc(lid, start + 2, (0, -0.1, 0.02))
-            key_scale(lid, start + 2, (1.0, 1.0, 1.0))
-            key_loc(lid, start + 5, (0, -0.06, 0.16))
-            key_scale(lid, start + 5, (0.01, 0.01, 0.01))
-
-    blink(lid_L, [48, 78])
-    blink(lid_R, [48, 78])
-
-    # Wave right arm (raise + wiggle)
-    # rest
-    key_rot(arm_R, 1, (0.15, 0.0, 0.2))
-    key_rot(arm_R, 30, (0.15, 0.0, 0.2))
-    # wave cycle
-    key_rot(arm_R, 35, (-0.9, 0.1, 0.5))
-    key_rot(arm_R, 40, (-0.7, -0.25, 0.55))
-    key_rot(arm_R, 45, (-0.95, 0.2, 0.5))
-    key_rot(arm_R, 50, (-0.7, -0.2, 0.55))
-    key_rot(arm_R, 55, (-0.9, 0.15, 0.5))
-    key_rot(arm_R, 62, (0.15, 0.0, 0.2))
-    key_rot(arm_R, 90, (0.15, 0.0, 0.2))
-
-    # Left arm idle micro motion
-    key_rot(parts["arm_L"], 1, (0.2, 0.0, -0.15))
-    key_rot(parts["arm_L"], 45, (0.28, 0.05, -0.2))
-    key_rot(parts["arm_L"], 90, (0.2, 0.0, -0.15))
-
-    # Make animations loop nicely
-    for obj in bpy.data.objects:
-        if obj.animation_data and obj.animation_data.action:
-            for fcurve in obj.animation_data.action.fcurves:
-                for kp in fcurve.keyframe_points:
-                    kp.interpolation = "BEZIER"
-                    kp.handle_left_type = "AUTO_CLAMPED"
-                    kp.handle_right_type = "AUTO_CLAMPED"
-
-
-def setup_preview_lighting() -> None:
-    # Soft studio lighting for preview PNG — bright cute look
-    bpy.ops.object.light_add(type="AREA", location=(1.5, -2.0, 2.2))
-    key = bpy.context.object
-    key.data.energy = 120
-    key.data.size = 2.5
-    key.data.color = (1.0, 0.98, 0.94)
-    key.rotation_euler = (math.radians(50), math.radians(15), math.radians(25))
-
-    bpy.ops.object.light_add(type="AREA", location=(-1.8, -1.0, 1.5))
-    fill = bpy.context.object
-    fill.data.energy = 50
-    fill.data.size = 3.0
-    fill.data.color = (0.75, 0.9, 1.0)
-
-    bpy.ops.object.light_add(type="AREA", location=(0.2, 1.5, 0.8))
-    rim = bpy.context.object
-    rim.data.energy = 40
-    rim.data.size = 2.0
-    rim.data.color = (1.0, 0.7, 0.35)
-
-    # World soft warm
-    world = bpy.data.worlds.new("NuriWorld")
-    bpy.context.scene.world = world
-    world.use_nodes = True
-    bg = world.node_tree.nodes["Background"]
-    bg.inputs[0].default_value = (0.18, 0.20, 0.24, 1.0)
-    bg.inputs[1].default_value = 0.6
-
-    # Camera — full-body framing so heart + feet read in preview
-    bpy.ops.object.camera_add(location=(0.0, -4.2, 0.25))
-    cam = bpy.context.object
-    cam.name = "PreviewCam"
-    cam.rotation_euler = (math.radians(90), 0, 0)
-    cam.data.lens = 70
-    bpy.context.scene.camera = cam
-
-
-def export_glb() -> None:
-    os.makedirs(os.path.dirname(OUT_GLB), exist_ok=True)
-    # Deselect lights/camera for cleaner export? Keep all char objects.
-    # Export whole scene animations
-    bpy.ops.export_scene.gltf(
-        filepath=OUT_GLB,
-        export_format="GLB",
-        export_animations=True,
-        export_force_sampling=True,
-        export_apply=False,
-        export_yup=True,
-        export_materials="EXPORT",
-        export_image_format="AUTO",
-        export_lights=False,
-        export_cameras=False,
-    )
-    print("WROTE", OUT_GLB, os.path.getsize(OUT_GLB))
-
-
-def render_preview() -> None:
-    scene = bpy.context.scene
-    scene.render.filepath = OUT_PNG
-    scene.render.image_settings.file_format = "PNG"
-    scene.render.image_settings.color_mode = "RGBA"
-    # EEVEE: amber emission reads as glow instead of Cycles blowout
-    try:
-        scene.render.engine = "BLENDER_EEVEE_NEXT"
-    except Exception:
-        try:
-            scene.render.engine = "BLENDER_EEVEE"
-        except Exception:
-            pass
-    # Soft bloom if available
-    eevee = getattr(scene, "eevee", None)
-    if eevee is not None:
-        if hasattr(eevee, "use_bloom"):
-            eevee.use_bloom = True
-            eevee.bloom_intensity = 0.08
-            eevee.bloom_threshold = 0.6
-    scene.view_settings.view_transform = "Standard"
-    scene.view_settings.exposure = -0.3
-    scene.frame_set(20)
-    bpy.ops.render.render(write_still=True)
-    print("WROTE", OUT_PNG, os.path.getsize(OUT_PNG) if os.path.exists(OUT_PNG) else 0)
-
-
-def main() -> None:
-    clear_scene()
-    parts = build_character()
-    animate(parts)
-    setup_preview_lighting()
-    export_glb()
-    render_preview()
-    print("DONE Nuri cute character build")
-
-
-if __name__ == "__main__":
-    main()
+def key_scale(obj, fr, s):
+    obj.scale = s
+    obj.keyframe_insert("scale", frame=fr)
+
+# breath + sway
+for fr, sz, ry in [(1, 1.0, -0.06), (30, 1.03, 0.0), (60, 1.0, 0.06), (90, 1.03, 0.0), (120, 1.0, -0.06)]:
+    key_scale(root, fr, (1.0, 1.0, sz))
+    key_rot(root, fr, (0, ry, 0))
+
+bp0 = body_pivot.location.copy()
+for fr, dy in [(1, 0), (30, 0.025), (60, 0), (90, 0.025), (120, 0)]:
+    key_loc(body_pivot, fr, (bp0.x, bp0.y, bp0.z + dy))
+
+# blink
+zl, zr = lid_l.location.z, lid_r.location.z
+yl, yr = lid_l.location.y, lid_r.location.y
+for fr, close in [(1, 0), (38, 0), (41, 1), (44, 0), (92, 0), (95, 1), (98, 0), (120, 0)]:
+    key_loc(lid_l, fr, (lid_l.location.x, yl + 0.04 * close, zl - 0.2 * close))
+    key_loc(lid_r, fr, (lid_r.location.x, yr + 0.04 * close, zr - 0.2 * close))
+
+# wing flutter
+for fr, a in [(1, -20), (30, -8), (60, -20), (90, -8), (120, -20)]:
+    key_rot(wing_l, fr, (math.radians(a), math.radians(-25), math.radians(-20)))
+    key_rot(wing_r, fr, (math.radians(a), math.radians(25), math.radians(20)))
+
+# tail wag
+for fr, rz in [(1, -0.15), (30, 0.2), (60, -0.15), (90, 0.2), (120, -0.15)]:
+    key_rot(tail, fr, (0, 0, rz))
+
+# cute wave (right arm)
+base_r = tuple(arm_r.rotation_euler)
+for fr, rx, rz in [
+    (1, base_r[0], base_r[2]),
+    (70, base_r[0], base_r[2]),
+    (80, math.radians(-20), math.radians(-1.0)),
+    (90, math.radians(-10), math.radians(-0.3)),
+    (100, math.radians(-20), math.radians(-1.0)),
+    (110, base_r[0], base_r[2]),
+    (120, base_r[0], base_r[2]),
+]:
+    key_rot(arm_r, fr, (rx, 0, rz))
+
+# --- preview studio ---
+# Face features are on +Y → camera must sit on +Y looking back at origin
+bpy.ops.object.light_add(type="AREA", location=(2.5, 3.2, 3.5))
+key = bpy.context.object
+key.data.energy = 320
+key.data.size = 3.5
+key.data.color = (1.0, 0.98, 0.95)
+key.rotation_euler = (math.radians(50), 0, math.radians(200))
+
+bpy.ops.object.light_add(type="AREA", location=(-2.8, 2.5, 2.2))
+fill = bpy.context.object
+fill.data.energy = 120
+fill.data.size = 2.8
+fill.data.color = (0.88, 0.94, 1.0)
+
+bpy.ops.object.light_add(type="AREA", location=(0.2, -2.2, 1.6))
+rim = bpy.context.object
+rim.data.energy = 90
+rim.data.size = 2.2
+rim.data.color = (1.0, 0.88, 0.85)
+
+bpy.ops.object.camera_add(location=(0, 5.6, 1.35), rotation=(math.radians(78), 0, math.radians(180)))
+cam = bpy.context.object
+cam.data.lens = 60
+scene.camera = cam
+
+bpy.ops.mesh.primitive_plane_add(size=8, location=(0, 0, -0.72))
+ground = bpy.context.object
+ground.name = "PreviewGround"
+gm, gbsdf = new_mat("Ground")
+paint(gbsdf, (0.96, 0.96, 0.97), 0.98)
+ground.data.materials.append(gm)
+
+world = bpy.data.worlds.new("Studio")
+scene.world = world
+world.use_nodes = True
+world.node_tree.nodes["Background"].inputs[0].default_value = (0.95, 0.96, 0.97, 1)
+world.node_tree.nodes["Background"].inputs[1].default_value = 1.0
+
+bpy.ops.render.render(write_still=True)
+print("PREVIEW", OUT_PREVIEW)
+
+# strip preview-only before export
+for obj in list(bpy.data.objects):
+    if obj.type in {"LIGHT", "CAMERA"} or obj.name == "PreviewGround":
+        bpy.data.objects.remove(obj, do_unlink=True)
+scene.world = None
+
+os.makedirs(os.path.dirname(OUT_GLB), exist_ok=True)
+bpy.ops.export_scene.gltf(
+    filepath=OUT_GLB,
+    export_format="GLB",
+    export_animations=True,
+    export_force_sampling=True,
+    export_apply=False,
+    export_yup=True,
+    export_materials="EXPORT",
+    export_image_format="AUTO",
+)
+print("GLB", OUT_GLB, os.path.getsize(OUT_GLB))
