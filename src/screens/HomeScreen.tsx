@@ -12,35 +12,47 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NuriPet } from '../components/NuriPet';
 import { MetricSimulator } from '../components/MetricSimulator';
+import { StylePanel } from '../components/StylePanel';
 import { moodFromVitality, scoreVitality, stageFromVitality } from '../logic/vitality';
+import { defaultStyle, resolveLook, type StyleLoadout } from '../style/catalog';
 import { colors, moodPalette } from '../theme';
 import { defaultMetrics, type DayMetrics } from '../types';
 
-const STORAGE_KEY = 'pulsepet.metrics.v1';
+const METRICS_KEY = 'pulsepet.metrics.v1';
+const STYLE_KEY = 'pulsepet.style.v1';
 
 export function HomeScreen() {
   const { width } = useWindowDimensions();
   const [metrics, setMetrics] = useState<DayMetrics>(defaultMetrics);
+  const [styleLoadout, setStyleLoadout] = useState<StyleLoadout>(defaultStyle);
+  const [styleTab, setStyleTab] = useState<'costume' | 'hair' | 'accessory'>('costume');
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (raw) setMetrics(JSON.parse(raw) as DayMetrics);
+    Promise.all([AsyncStorage.getItem(METRICS_KEY), AsyncStorage.getItem(STYLE_KEY)])
+      .then(([metricsRaw, styleRaw]) => {
+        if (metricsRaw) setMetrics(JSON.parse(metricsRaw) as DayMetrics);
+        if (styleRaw) setStyleLoadout(JSON.parse(styleRaw) as StyleLoadout);
       })
       .finally(() => setReady(true));
   }, []);
 
   useEffect(() => {
     if (!ready) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(metrics)).catch(() => undefined);
+    AsyncStorage.setItem(METRICS_KEY, JSON.stringify(metrics)).catch(() => undefined);
   }, [metrics, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    AsyncStorage.setItem(STYLE_KEY, JSON.stringify(styleLoadout)).catch(() => undefined);
+  }, [styleLoadout, ready]);
 
   const vitality = useMemo(() => scoreVitality(metrics), [metrics]);
   const mood = moodFromVitality(vitality);
   const stage = stageFromVitality(vitality);
+  const look = resolveLook(styleLoadout);
   const palette = moodPalette[mood];
-  const petSize = Math.min(280, width * 0.72);
+  const petSize = Math.min(300, width * 0.78);
 
   return (
     <LinearGradient colors={[...palette.sky]} style={styles.flex}>
@@ -52,7 +64,7 @@ export function HomeScreen() {
           </View>
 
           <View style={styles.stage}>
-            <NuriPet mood={mood} stage={stage} size={petSize} />
+            <NuriPet mood={mood} stage={stage} look={look} size={petSize} />
             <Text style={styles.petName}>Nuri</Text>
             <Text style={styles.letter}>«{palette.letter}»</Text>
           </View>
@@ -63,13 +75,23 @@ export function HomeScreen() {
             <VitalChip label="Стадия" value={`${stage}/3`} />
           </View>
 
+          <StylePanel
+            styleLoadout={styleLoadout}
+            tab={styleTab}
+            onTabChange={setStyleTab}
+            onChange={setStyleLoadout}
+          />
+
           <MetricSimulator metrics={metrics} onChange={setMetrics} />
 
           <Pressable
-            onPress={() => setMetrics(defaultMetrics)}
+            onPress={() => {
+              setMetrics(defaultMetrics);
+              setStyleLoadout(defaultStyle);
+            }}
             style={({ pressed }) => [styles.reset, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.resetText}>Сбросить день</Text>
+            <Text style={styles.resetText}>Сбросить день и образ</Text>
           </Pressable>
 
           <Text style={styles.footnote}>
