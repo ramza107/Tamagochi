@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
 import type { MoodKey } from '../theme';
 import { moodPalette } from '../theme';
-import type { LookId } from '../style/catalog';
+import { itemById, type Equipped } from '../shop/catalog';
+import { SvgClothes } from './SvgClothes';
 
 type Props = {
   mood: MoodKey;
   stage: 1 | 2 | 3;
-  look: LookId;
+  equipped: Equipped;
   size?: number;
-  onWave?: () => void;
 };
 
 const moodSprites: Record<MoodKey, number> = {
@@ -19,37 +19,25 @@ const moodSprites: Record<MoodKey, number> = {
   drained: require('../../assets/nuri-drained.jpg'),
 };
 
-const lookSprites: Record<Exclude<LookId, 'classic'>, number> = {
-  hoodie: require('../../assets/look-hoodie.jpg'),
-  sailor: require('../../assets/look-sailor.jpg'),
-  bow: require('../../assets/look-bow.jpg'),
-  autumn: require('../../assets/look-autumn.jpg'),
-};
-
 const waveSprite = require('../../assets/nuri-wave.jpg');
 
-export function NuriPet({ mood, stage, look, size = 280, onWave }: Props) {
+/**
+ * One base Nuri model + layered cosmetics on top (buyable in shop).
+ */
+export function NuriPet({ mood, stage, equipped, size = 280 }: Props) {
   const breath = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
   const floatY = useRef(new Animated.Value(0)).current;
   const waveTilt = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(1)).current;
   const [waving, setWaving] = useState(false);
 
   const palette = moodPalette[mood];
   const drained = mood === 'drained' || mood === 'drowsy';
   const stageScale = 0.92 + stage * 0.04;
 
-  const baseSource =
-    look === 'classic' ? moodSprites[mood] : lookSprites[look];
-  const source = waving ? waveSprite : baseSource;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.timing(fade, { toValue: 0.4, duration: 100, useNativeDriver: true }),
-      Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }),
-    ]).start();
-  }, [fade, look, mood]);
+  const costume = itemById(equipped.costume);
+  const hair = itemById(equipped.hair);
+  const accessory = itemById(equipped.accessory);
 
   useEffect(() => {
     const breathLoop = Animated.loop(
@@ -100,7 +88,6 @@ export function NuriPet({ mood, stage, look, size = 280, onWave }: Props) {
         }),
       ]),
     );
-
     breathLoop.start();
     pulseLoop.start();
     floatLoop.start();
@@ -111,15 +98,13 @@ export function NuriPet({ mood, stage, look, size = 280, onWave }: Props) {
     };
   }, [breath, drained, floatY, pulse]);
 
-  // idle wave every ~8s when healthy
   useEffect(() => {
     if (drained) return;
-    const id = setInterval(() => triggerWave(false), 8000);
+    const id = setInterval(() => triggerWave(), 8500);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drained, look]);
+  }, [drained]);
 
-  function triggerWave(fromTap: boolean) {
+  function triggerWave() {
     setWaving((already) => {
       if (already) return already;
       waveTilt.setValue(0);
@@ -129,8 +114,7 @@ export function NuriPet({ mood, stage, look, size = 280, onWave }: Props) {
         Animated.timing(waveTilt, { toValue: 1, duration: 140, useNativeDriver: true }),
         Animated.timing(waveTilt, { toValue: 0, duration: 140, useNativeDriver: true }),
       ]).start();
-      onWave?.();
-      setTimeout(() => setWaving(false), fromTap ? 1000 : 850);
+      setTimeout(() => setWaving(false), 950);
       return true;
     });
   }
@@ -156,29 +140,66 @@ export function NuriPet({ mood, stage, look, size = 280, onWave }: Props) {
     outputRange: [drained ? 0.08 : 0.16, drained ? 0.18 : 0.38],
   });
 
+  const layers = [costume, hair, accessory].filter(Boolean);
+
   return (
     <View style={{ width: size, height: size + 18, alignItems: 'center', justifyContent: 'center' }}>
-      <Pressable onPress={() => triggerWave(true)}>
-        <Animated.View style={{ opacity: fade, transform: [{ translateY }, { scale }, { rotate }] }}>
-          <Image source={source} style={{ width: size, height: size }} resizeMode="contain" />
-          {!waving && look === 'classic' && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.heartGlow,
-                {
-                  width: size * 0.28,
-                  height: size * 0.28,
-                  borderRadius: size * 0.14,
-                  backgroundColor: palette.core,
-                  left: size * 0.36,
-                  top: size * 0.48,
-                  opacity: glowOpacity,
-                  transform: [{ scale: glowScale }],
-                },
-              ]}
+      <Pressable onPress={triggerWave}>
+        <Animated.View style={{ transform: [{ translateY }, { scale }, { rotate }] }}>
+          <View style={{ width: size, height: size }}>
+            <Image
+              source={waving ? waveSprite : moodSprites[mood]}
+              style={{ width: size, height: size }}
+              resizeMode="contain"
             />
-          )}
+            {!waving && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.heartGlow,
+                  {
+                    width: size * 0.28,
+                    height: size * 0.28,
+                    borderRadius: size * 0.14,
+                    backgroundColor: palette.core,
+                    left: size * 0.36,
+                    top: size * 0.48,
+                    opacity: glowOpacity,
+                    transform: [{ scale: glowScale }],
+                  },
+                ]}
+              />
+            )}
+            {!waving &&
+              layers.map((item) => {
+                if (!item) return null;
+                const box = {
+                  position: 'absolute' as const,
+                  left: size * item.layout.x,
+                  top: size * item.layout.y,
+                  width: size * item.layout.w,
+                  height: size * item.layout.h,
+                };
+                if (item.render === 'png' && item.asset) {
+                  return (
+                    <Image
+                      key={item.id}
+                      source={item.asset}
+                      style={box}
+                      resizeMode="contain"
+                    />
+                  );
+                }
+                if (item.render === 'svg' && item.svg) {
+                  return (
+                    <View key={item.id} style={box} pointerEvents="none">
+                      <SvgClothes id={item.svg} width={box.width} height={box.height} />
+                    </View>
+                  );
+                }
+                return null;
+              })}
+          </View>
         </Animated.View>
       </Pressable>
       <View style={[styles.shadow, { width: size * 0.42, opacity: drained ? 0.18 : 0.28 }]} />

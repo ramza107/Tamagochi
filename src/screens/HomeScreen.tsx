@@ -12,27 +12,46 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NuriPet } from '../components/NuriPet';
 import { MetricSimulator } from '../components/MetricSimulator';
-import { StylePanel } from '../components/StylePanel';
+import { ShopPanel } from '../components/ShopPanel';
 import { moodFromVitality, scoreVitality, stageFromVitality } from '../logic/vitality';
-import { defaultStyle, resolveLook, type StyleLoadout } from '../style/catalog';
+import {
+  STARTING_BALANCE,
+  emptyEquipped,
+  type Equipped,
+  type ItemSlot,
+  type ShopItem,
+} from '../shop/catalog';
 import { colors, moodPalette } from '../theme';
 import { defaultMetrics, type DayMetrics } from '../types';
 
 const METRICS_KEY = 'pulsepet.metrics.v1';
-const STYLE_KEY = 'pulsepet.style.v1';
+const WALLET_KEY = 'pulsepet.wallet.v2';
+
+type Wallet = {
+  balance: number;
+  owned: string[];
+  equipped: Equipped;
+};
+
+const defaultWallet: Wallet = {
+  balance: STARTING_BALANCE,
+  owned: [],
+  equipped: emptyEquipped,
+};
 
 export function HomeScreen() {
   const { width } = useWindowDimensions();
   const [metrics, setMetrics] = useState<DayMetrics>(defaultMetrics);
-  const [styleLoadout, setStyleLoadout] = useState<StyleLoadout>(defaultStyle);
-  const [styleTab, setStyleTab] = useState<'costume' | 'hair' | 'accessory'>('costume');
+  const [wallet, setWallet] = useState<Wallet>(defaultWallet);
+  const [shopTab, setShopTab] = useState<ItemSlot>('costume');
+  const [toast, setToast] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(METRICS_KEY), AsyncStorage.getItem(STYLE_KEY)])
-      .then(([metricsRaw, styleRaw]) => {
+    Promise.all([AsyncStorage.getItem(METRICS_KEY), AsyncStorage.getItem(WALLET_KEY)])
+      .then(([metricsRaw, walletRaw]) => {
         if (metricsRaw) setMetrics(JSON.parse(metricsRaw) as DayMetrics);
-        if (styleRaw) setStyleLoadout(JSON.parse(styleRaw) as StyleLoadout);
+        if (walletRaw) setWallet(JSON.parse(walletRaw) as Wallet);
       })
       .finally(() => setReady(true));
   }, []);
@@ -44,15 +63,49 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (!ready) return;
-    AsyncStorage.setItem(STYLE_KEY, JSON.stringify(styleLoadout)).catch(() => undefined);
-  }, [styleLoadout, ready]);
+    AsyncStorage.setItem(WALLET_KEY, JSON.stringify(wallet)).catch(() => undefined);
+  }, [wallet, ready]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const vitality = useMemo(() => scoreVitality(metrics), [metrics]);
   const mood = moodFromVitality(vitality);
   const stage = stageFromVitality(vitality);
-  const look = resolveLook(styleLoadout);
   const palette = moodPalette[mood];
   const petSize = Math.min(300, width * 0.78);
+
+  function buy(item: ShopItem) {
+    setWallet((w) => {
+      if (w.owned.includes(item.id)) return w;
+      if (w.balance < item.price) {
+        setToast('Не хватает Pulse');
+        return w;
+      }
+      setToast(`Куплено: ${item.name}`);
+      return {
+        ...w,
+        balance: w.balance - item.price,
+        owned: [...w.owned, item.id],
+        equipped: { ...w.equipped, [item.slot]: item.id },
+      };
+    });
+  }
+
+  function equip(item: ShopItem) {
+    setWallet((w) => {
+      if (!w.owned.includes(item.id)) return w;
+      setToast(`Надето: ${item.name}`);
+      return { ...w, equipped: { ...w.equipped, [item.slot]: item.id } };
+    });
+  }
+
+  function unequip(slot: ItemSlot) {
+    setWallet((w) => ({ ...w, equipped: { ...w.equipped, [slot]: null } }));
+  }
 
   return (
     <LinearGradient colors={[...palette.sky]} style={styles.flex}>
@@ -64,9 +117,10 @@ export function HomeScreen() {
           </View>
 
           <View style={styles.stage}>
-            <NuriPet mood={mood} stage={stage} look={look} size={petSize} />
+            <NuriPet mood={mood} stage={stage} equipped={wallet.equipped} size={petSize} />
             <Text style={styles.petName}>Nuri</Text>
             <Text style={styles.letter}>«{palette.letter}»</Text>
+            {toast ? <Text style={styles.toast}>{toast}</Text> : null}
           </View>
 
           <View style={styles.vitals}>
@@ -75,11 +129,15 @@ export function HomeScreen() {
             <VitalChip label="Стадия" value={`${stage}/3`} />
           </View>
 
-          <StylePanel
-            styleLoadout={styleLoadout}
-            tab={styleTab}
-            onTabChange={setStyleTab}
-            onChange={setStyleLoadout}
+          <ShopPanel
+            balance={wallet.balance}
+            owned={wallet.owned}
+            equipped={wallet.equipped}
+            tab={shopTab}
+            onTabChange={setShopTab}
+            onBuy={buy}
+            onEquip={equip}
+            onUnequip={unequip}
           />
 
           <MetricSimulator metrics={metrics} onChange={setMetrics} />
@@ -87,15 +145,16 @@ export function HomeScreen() {
           <Pressable
             onPress={() => {
               setMetrics(defaultMetrics);
-              setStyleLoadout(defaultStyle);
+              setWallet(defaultWallet);
+              setToast('Сброшено');
             }}
             style={({ pressed }) => [styles.reset, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.resetText}>Сбросить день и образ</Text>
+            <Text style={styles.resetText}>Сбросить день и покупки</Text>
           </Pressable>
 
           <Text style={styles.footnote}>
-            Сейчас метрики симулируются. На Mac подключим HealthKit, виджеты и Live Activity.
+            Костюмы — отдельные слои на одной модели. Позже здесь будет реальный IAP.
           </Text>
         </ScrollView>
       </SafeAreaView>
@@ -133,10 +192,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 18,
   },
-  hero: {
-    gap: 6,
-    paddingTop: 8,
-  },
+  hero: { gap: 6, paddingTop: 8 },
   brand: {
     fontFamily: 'Fraunces_700Bold',
     fontSize: 42,
@@ -151,11 +207,7 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     maxWidth: 280,
   },
-  stage: {
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-  },
+  stage: { alignItems: 'center', gap: 6, paddingVertical: 8 },
   petName: {
     fontFamily: 'Fraunces_600SemiBold',
     fontSize: 28,
@@ -170,10 +222,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
   },
-  vitals: {
-    flexDirection: 'row',
-    gap: 10,
+  toast: {
+    fontFamily: 'Manrope_600SemiBold',
+    fontSize: 13,
+    color: colors.mossDeep,
+    marginTop: 4,
   },
+  vitals: { flexDirection: 'row', gap: 10 },
   chip: {
     flex: 1,
     paddingVertical: 12,
@@ -194,11 +249,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.ink,
   },
-  reset: {
-    alignSelf: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
+  reset: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16 },
   resetText: {
     fontFamily: 'Manrope_600SemiBold',
     fontSize: 14,
