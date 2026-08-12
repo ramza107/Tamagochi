@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, View } from 'react-native';
 import type { Behavior } from '../logic/behavior';
 import type { Equipped } from '../shop/catalog';
 
@@ -10,9 +10,22 @@ type Props = {
   size?: number;
 };
 
+const poseModules = {
+  idle: require('../../assets/nuri3d/idle.jpg'),
+  sleepy: require('../../assets/nuri3d/sleepy.jpg'),
+  blink: require('../../assets/nuri3d/blink.jpg'),
+  wave: require('../../assets/nuri3d/wave.jpg'),
+  kick: require('../../assets/nuri3d/kick.jpg'),
+};
+
+function uriOf(mod: number) {
+  const src = Image.resolveAssetSource(mod);
+  return src?.uri ?? '';
+}
+
 /**
- * Realtime 3D Nuri (Three.js) — continuously animated character, not image swaps.
- * Web-first (GitHub Pages / Expo web).
+ * The pretty rendered Nuri — same look as the good pictures —
+ * living in a realtime 3D stage (breath/sway + behavior poses).
  */
 export function LivingNuri({ behavior, size = 320 }: Props) {
   const hostRef = useRef<View>(null);
@@ -30,15 +43,24 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
       canvas.style.width = '100%';
       canvas.style.height = '100%';
       canvas.style.display = 'block';
-      canvas.style.borderRadius = '24px';
+      canvas.style.borderRadius = '28px';
 
-      // RNW View -> DOM node
       const node = hostRef.current as unknown as HTMLElement | null;
       if (!node) return;
       node.innerHTML = '';
       node.appendChild(canvas);
 
-      const handle = mountNuri3D(canvas, behavior);
+      const handle = mountNuri3D(
+        canvas,
+        {
+          idle: uriOf(poseModules.idle),
+          sleepy: uriOf(poseModules.sleepy),
+          blink: uriOf(poseModules.blink),
+          wave: uriOf(poseModules.wave),
+          kick: uriOf(poseModules.kick),
+        },
+        behavior,
+      );
       handleRef.current = handle;
     })();
 
@@ -49,7 +71,6 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
       const node = hostRef.current as unknown as HTMLElement | null;
       if (node) node.innerHTML = '';
     };
-    // mount once
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -60,7 +81,7 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
   if (Platform.OS !== 'web') {
     return (
       <View style={[styles.fallback, { width: size, height: size }]}>
-        <Text style={styles.fallbackText}>3D Nuri сейчас в веб-версии</Text>
+        <Image source={poseModules.idle} style={{ width: size, height: size, borderRadius: 28 }} />
       </View>
     );
   }
@@ -69,16 +90,5 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
 }
 
 const styles = StyleSheet.create({
-  fallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  fallbackText: {
-    fontFamily: 'Manrope_500Medium',
-    color: '#5A6B5E',
-    padding: 16,
-    textAlign: 'center',
-  },
+  fallback: { alignItems: 'center', justifyContent: 'center' },
 });
