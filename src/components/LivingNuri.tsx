@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import type { Behavior } from '../logic/behavior';
 import type { Equipped } from '../shop/catalog';
-import { itemById } from '../shop/catalog';
-import { SvgClothes } from './SvgClothes';
 
 type Props = {
   behavior: Behavior;
@@ -12,197 +10,75 @@ type Props = {
   size?: number;
 };
 
-type Pose = 'idle' | 'sleepy' | 'blink' | 'wave' | 'kick';
-
-const poses: Record<Pose, number> = {
-  idle: require('../../assets/nuri3d/idle.jpg'),
-  sleepy: require('../../assets/nuri3d/sleepy.jpg'),
-  blink: require('../../assets/nuri3d/blink.jpg'),
-  wave: require('../../assets/nuri3d/wave.jpg'),
-  kick: require('../../assets/nuri3d/kick.jpg'),
-};
-
 /**
- * Talking-Ben style: one finished 3D character, animated via pose frames.
- * Same hero always — never a sketch swap.
+ * Realtime 3D Nuri (Three.js) — continuously animated character, not image swaps.
+ * Web-first (GitHub Pages / Expo web).
  */
-export function LivingNuri({ behavior, stage, equipped, size = 320 }: Props) {
-  const [pose, setPose] = useState<Pose>('idle');
-  const breath = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(1)).current;
-  const bounce = useRef(new Animated.Value(0)).current;
+export function LivingNuri({ behavior, size = 320 }: Props) {
+  const hostRef = useRef<View>(null);
+  const handleRef = useRef<{ setBehavior: (b: Behavior) => void; dispose: () => void } | null>(null);
 
-  const costume = itemById(equipped.costume);
-  const hair = itemById(equipped.hair);
-  const accessory = itemById(equipped.accessory);
-  const stageScale = 0.96 + stage * 0.02;
-
-  // subtle living motion on whatever pose is shown
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breath, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(breath, {
-          toValue: 0,
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [breath]);
-
-  // pose director — like Talking Ben reactions
-  useEffect(() => {
+    if (Platform.OS !== 'web') return;
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
 
-    const show = (next: Pose) => {
+    (async () => {
+      const { mountNuri3D } = await import('../nuri3d/mountNuri3D');
       if (cancelled) return;
-      Animated.sequence([
-        Animated.timing(fade, { toValue: 0.35, duration: 90, useNativeDriver: true }),
-        Animated.timing(fade, { toValue: 1, duration: 160, useNativeDriver: true }),
-      ]).start();
-      setPose(next);
-    };
 
-    bounce.setValue(0);
+      const canvas = document.createElement('canvas');
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.display = 'block';
+      canvas.style.borderRadius = '24px';
 
-    if (behavior === 'idle') {
-      show('idle');
-      timer = setInterval(() => {
-        if (cancelled) return;
-        // blink then wave then back — keeps him alive
-        show('blink');
-        timeout = setTimeout(() => {
-          if (cancelled) return;
-          show('wave');
-          timeout = setTimeout(() => {
-            if (!cancelled) show('idle');
-          }, 900);
-        }, 180);
-      }, 4200);
-      return () => {
-        cancelled = true;
-        clearInterval(timer);
-        if (timeout) clearTimeout(timeout);
-      };
-    }
+      // RNW View -> DOM node
+      const node = hostRef.current as unknown as HTMLElement | null;
+      if (!node) return;
+      node.innerHTML = '';
+      node.appendChild(canvas);
 
-    if (behavior === 'sleepy') {
-      show('sleepy');
-      return () => {
-        cancelled = true;
-      };
-    }
+      const handle = mountNuri3D(canvas, behavior);
+      handleRef.current = handle;
+    })();
 
-    if (behavior === 'screen') {
-      let closed = false;
-      show('idle');
-      timer = setInterval(() => {
-        closed = !closed;
-        show(closed ? 'blink' : 'idle');
-      }, 220);
-      timeout = setTimeout(() => {
-        if (cancelled) return;
-        clearInterval(timer);
-        show('blink');
-      }, 1400);
-      return () => {
-        cancelled = true;
-        clearInterval(timer);
-        if (timeout) clearTimeout(timeout);
-      };
-    }
-
-    // walk / kick pebble — full 3D kick pose looping
-    show('kick');
-    const kickPulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounce, {
-          toValue: 1,
-          duration: 280,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounce, {
-          toValue: 0,
-          duration: 320,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.delay(900),
-      ]),
-    );
-    kickPulse.start();
     return () => {
       cancelled = true;
-      kickPulse.stop();
+      handleRef.current?.dispose();
+      handleRef.current = null;
+      const node = hostRef.current as unknown as HTMLElement | null;
+      if (node) node.innerHTML = '';
     };
-  }, [behavior, bounce, fade]);
+    // mount once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const scale = breath.interpolate({
-    inputRange: [0, 1],
-    outputRange: [stageScale, stageScale * 1.02],
-  });
-  const kickY = bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
+  useEffect(() => {
+    handleRef.current?.setBehavior(behavior);
+  }, [behavior]);
 
-  const layers = [costume, hair, accessory].filter(Boolean);
+  if (Platform.OS !== 'web') {
+    return (
+      <View style={[styles.fallback, { width: size, height: size }]}>
+        <Text style={styles.fallbackText}>3D Nuri сейчас в веб-версии</Text>
+      </View>
+    );
+  }
 
-  return (
-    <View style={{ width: size, height: size + 16, alignItems: 'center' }}>
-      <Animated.View
-        style={{
-          width: size,
-          height: size,
-          opacity: fade,
-          transform: [{ translateY: kickY }, { scale }],
-        }}
-      >
-        <Image source={poses[pose]} style={{ width: size, height: size, borderRadius: 24 }} resizeMode="cover" />
-
-        {/* cosmetics still stack on the same 3D hero */}
-        {layers.map((item) => {
-          if (!item) return null;
-          const box = {
-            position: 'absolute' as const,
-            left: size * item.layout.x,
-            top: size * item.layout.y,
-            width: size * item.layout.w,
-            height: size * item.layout.h,
-          };
-          if (item.render === 'png' && item.asset) {
-            return <Image key={item.id} source={item.asset} style={box} resizeMode="contain" />;
-          }
-          if (item.render === 'svg' && item.svg) {
-            return (
-              <View key={item.id} style={box} pointerEvents="none">
-                <SvgClothes id={item.svg} width={box.width} height={box.height} />
-              </View>
-            );
-          }
-          return null;
-        })}
-      </Animated.View>
-      <View style={[styles.shadow, { width: size * 0.45 }]} />
-    </View>
-  );
+  return <View ref={hostRef} style={{ width: size, height: size }} />;
 }
 
 const styles = StyleSheet.create({
-  shadow: {
-    height: 14,
-    borderRadius: 999,
-    backgroundColor: '#1a2430',
-    opacity: 0.25,
-    marginTop: 2,
+  fallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  fallbackText: {
+    fontFamily: 'Manrope_500Medium',
+    color: '#5A6B5E',
+    padding: 16,
+    textAlign: 'center',
   },
 });
