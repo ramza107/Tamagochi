@@ -4,15 +4,20 @@
 
 ## Открыть в браузере
 
-**Постоянная ссылка (после включения GitHub Pages):**  
-https://ramza107.github.io/Tamagochi/
+**Ссылка:** https://ramza107.github.io/Tamagochi/
 
-Как включить один раз:  
-Repository → Settings → Pages → Deploy from a branch → branch `cursor/pulsepet-mvp-249e` (или `main`), folder `/docs` → Save  
-или Source: **GitHub Actions** (workflow `Deploy Pulsepet Web`).
+### Если сайт не открывается (404)
 
-**Временный превью-хостинг** (может истечь без API-ключа Tiiny):  
-https://chocolate-brittani-39.tiiny.site/
+В https://github.com/ramza107/Tamagochi/settings/pages поставь:
+
+1. Source: **Deploy from a branch**
+2. Branch: **`gh-pages`**
+3. Folder: **`/ (root)`**
+4. Save
+
+Подожди 1–2 минуты и обнови страницу (лучше Ctrl+Shift+R).
+
+Альтернатива: branch `cursor/pulsepet-mvp-249e`, folder **`/docs`**.
 
 ## Локально
 
@@ -21,18 +26,6 @@ npm install
 npm run web
 ```
 
-Или статическая сборка:
-
-```bash
-npm run build:web
-npx serve dist
-```
-
 ## Идея
 
 **Nuri** — мягкий моховый камешек с янтарным «ядром-пульсом». Сон, шаги и экранное время меняют цвет, позу и письма.
-
-## Сейчас / позже
-
-- MVP: анимации, 4 настроения, симулятор метрик, веб
-- На Mac: HealthKit, виджеты, Live Activity, App Store
