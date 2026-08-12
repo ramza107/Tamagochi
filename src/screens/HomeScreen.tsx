@@ -13,7 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NuriPet } from '../components/NuriPet';
 import { MetricSimulator } from '../components/MetricSimulator';
 import { ShopPanel } from '../components/ShopPanel';
-import { moodFromVitality, scoreVitality, stageFromVitality } from '../logic/vitality';
+import { behaviorFromMetrics, behaviorLetter } from '../logic/behavior';
+import { stageFromVitality, scoreVitality } from '../logic/vitality';
 import {
   STARTING_BALANCE,
   emptyEquipped,
@@ -21,7 +22,7 @@ import {
   type ItemSlot,
   type ShopItem,
 } from '../shop/catalog';
-import { colors, moodPalette } from '../theme';
+import { colors } from '../theme';
 import { defaultMetrics, type DayMetrics } from '../types';
 
 const METRICS_KEY = 'pulsepet.metrics.v1';
@@ -38,6 +39,8 @@ const defaultWallet: Wallet = {
   owned: [],
   equipped: emptyEquipped,
 };
+
+const sky = ['#C9DCE8', '#E5E1D4', '#F4EBDD'] as const;
 
 export function HomeScreen() {
   const { width } = useWindowDimensions();
@@ -73,10 +76,10 @@ export function HomeScreen() {
   }, [toast]);
 
   const vitality = useMemo(() => scoreVitality(metrics), [metrics]);
-  const mood = moodFromVitality(vitality);
   const stage = stageFromVitality(vitality);
-  const palette = moodPalette[mood];
-  const petSize = Math.min(300, width * 0.78);
+  const behavior = useMemo(() => behaviorFromMetrics(metrics), [metrics]);
+  const letter = behaviorLetter(behavior);
+  const petSize = Math.min(320, width * 0.82);
 
   function buy(item: ShopItem) {
     setWallet((w) => {
@@ -108,26 +111,39 @@ export function HomeScreen() {
   }
 
   return (
-    <LinearGradient colors={[...palette.sky]} style={styles.flex}>
+    <LinearGradient colors={[...sky]} style={styles.flex}>
       <SafeAreaView style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <Text style={styles.brand}>Pulsepet</Text>
-            <Text style={styles.tagline}>Питомец, которого кормит твоя жизнь</Text>
+            <Text style={styles.tagline}>Один живой Nuri. Он двигается и просит заботы.</Text>
           </View>
 
           <View style={styles.stage}>
-            <NuriPet mood={mood} stage={stage} equipped={wallet.equipped} size={petSize} />
+            <View style={styles.stageFrame}>
+              <NuriPet
+                behavior={behavior}
+                stage={stage}
+                equipped={wallet.equipped}
+                size={petSize}
+              />
+            </View>
             <Text style={styles.petName}>Nuri</Text>
-            <Text style={styles.letter}>«{palette.letter}»</Text>
+            <Text style={styles.behaviorTag}>{behaviorLabel(behavior)}</Text>
+            <Text style={styles.letter}>«{letter}»</Text>
             {toast ? <Text style={styles.toast}>{toast}</Text> : null}
           </View>
 
           <View style={styles.vitals}>
             <VitalChip label="Жизнь" value={`${vitality}`} />
-            <VitalChip label="Настрой" value={moodLabel(mood)} />
+            <VitalChip label="Поведение" value={behaviorLabel(behavior)} />
             <VitalChip label="Стадия" value={`${stage}/3`} />
           </View>
+
+          <Text style={styles.guide}>
+            Мало сна → клонит в сон. Много экрана → моргает и закрывает глаза. Мало шагов → пинает
+            камушек.
+          </Text>
 
           <ShopPanel
             balance={wallet.balance}
@@ -152,14 +168,23 @@ export function HomeScreen() {
           >
             <Text style={styles.resetText}>Сбросить день и покупки</Text>
           </Pressable>
-
-          <Text style={styles.footnote}>
-            Костюмы — отдельные слои на одной модели. Позже здесь будет реальный IAP.
-          </Text>
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
+}
+
+function behaviorLabel(b: ReturnType<typeof behaviorFromMetrics>) {
+  switch (b) {
+    case 'sleepy':
+      return 'Хочет спать';
+    case 'screen':
+      return 'Много экрана';
+    case 'walk':
+      return 'Хочет гулять';
+    default:
+      return 'Спокоен';
+  }
 }
 
 function VitalChip({ label, value }: { label: string; value: string }) {
@@ -171,26 +196,13 @@ function VitalChip({ label, value }: { label: string; value: string }) {
   );
 }
 
-function moodLabel(mood: keyof typeof moodPalette) {
-  switch (mood) {
-    case 'thriving':
-      return 'Яркий';
-    case 'steady':
-      return 'Ровный';
-    case 'drowsy':
-      return 'Сонный';
-    case 'drained':
-      return 'Пустой';
-  }
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: {
     paddingHorizontal: 24,
     paddingBottom: 48,
     paddingTop: 12,
-    gap: 18,
+    gap: 16,
   },
   hero: { gap: 6, paddingTop: 8 },
   brand: {
@@ -205,14 +217,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     color: colors.inkSoft,
-    maxWidth: 280,
+    maxWidth: 320,
   },
-  stage: { alignItems: 'center', gap: 6, paddingVertical: 8 },
+  stage: { alignItems: 'center', gap: 4 },
+  stageFrame: {
+    width: '100%',
+    alignItems: 'center',
+    borderRadius: 28,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
   petName: {
     fontFamily: 'Fraunces_600SemiBold',
     fontSize: 28,
     color: colors.ink,
     marginTop: 4,
+  },
+  behaviorTag: {
+    fontFamily: 'Manrope_600SemiBold',
+    fontSize: 13,
+    color: colors.mossDeep,
   },
   letter: {
     fontFamily: 'Manrope_500Medium',
@@ -220,13 +244,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: colors.inkSoft,
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 320,
   },
   toast: {
     fontFamily: 'Manrope_600SemiBold',
     fontSize: 13,
     color: colors.mossDeep,
-    marginTop: 4,
   },
   vitals: { flexDirection: 'row', gap: 10 },
   chip: {
@@ -246,21 +269,19 @@ const styles = StyleSheet.create({
   },
   chipValue: {
     fontFamily: 'Fraunces_600SemiBold',
-    fontSize: 18,
+    fontSize: 16,
     color: colors.ink,
+  },
+  guide: {
+    fontFamily: 'Manrope_500Medium',
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.inkSoft,
   },
   reset: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 16 },
   resetText: {
     fontFamily: 'Manrope_600SemiBold',
     fontSize: 14,
     color: colors.mossDeep,
-  },
-  footnote: {
-    fontFamily: 'Manrope_500Medium',
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.inkSoft,
-    textAlign: 'center',
-    opacity: 0.85,
   },
 });
