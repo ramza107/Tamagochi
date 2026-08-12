@@ -35,7 +35,8 @@
       "name": "Pulsepet"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-asset"
     ],
     "experiments": {
       "baseUrl": "/Tamagochi"

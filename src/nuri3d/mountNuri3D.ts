@@ -3,177 +3,156 @@ import type { Behavior } from '../logic/behavior';
 
 export type NuriHandle = {
   setBehavior: (b: Behavior) => void;
+  resize: (cssSize: number) => void;
   dispose: () => void;
 };
 
-export type NuriPoseUrls = {
-  idle: string;
-  sleepy: string;
-  blink: string;
-  wave: string;
-  kick: string;
-};
-
+export type NuriPoseUrls = Record<'idle' | 'sleepy' | 'blink' | 'wave' | 'kick', string>;
 type Pose = keyof NuriPoseUrls;
 
-/**
- * Beautiful rendered Nuri (the pretty pictures) living in a realtime 3D stage:
- * continuous breath/sway + pose crossfades + real 3D pebble kick.
- */
 export function mountNuri3D(
   canvas: HTMLCanvasElement,
   urls: NuriPoseUrls,
+  cssSize: number,
   initialBehavior: Behavior = 'idle',
 ): NuriHandle {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: false,
+    powerPreference: 'high-performance',
+  });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.shadowMap.enabled = true;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.08;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#2B3138');
-  scene.fog = new THREE.Fog('#2B3138', 6, 14);
 
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 40);
-  camera.position.set(0, 0.2, 3.6);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 40);
+  camera.position.set(0, 0.15, 3.35);
   camera.lookAt(0, 0.05, 0);
 
-  const hemi = new THREE.HemisphereLight('#fff2e8', '#3a4550', 0.9);
-  const key = new THREE.DirectionalLight('#ffffff', 1.3);
-  key.position.set(2, 4, 3);
-  key.castShadow = true;
-  const rim = new THREE.DirectionalLight('#9ecbff', 0.4);
-  rim.position.set(-3, 2, -1);
-  scene.add(hemi, key, rim);
-
-  const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(1.8, 64),
-    new THREE.MeshStandardMaterial({ color: '#3A424C', roughness: 0.95 }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -1.05;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  scene.add(new THREE.AmbientLight('#ffffff', 0.95));
+  const key = new THREE.DirectionalLight('#ffffff', 0.55);
+  key.position.set(2, 3, 4);
+  scene.add(key);
 
   const root = new THREE.Group();
-  root.position.y = -0.05;
   scene.add(root);
 
-  // two planes for crossfade between beautiful renders
-  const geo = new THREE.PlaneGeometry(2.1, 2.1);
-  const matA = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
-  const matB = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+  const geo = new THREE.PlaneGeometry(2.05, 2.05);
+  const matA = new THREE.MeshBasicMaterial({ transparent: true });
+  const matB = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
   const planeA = new THREE.Mesh(geo, matA);
   const planeB = new THREE.Mesh(geo, matB);
-  planeA.position.z = 0.01;
-  planeB.position.z = 0.02;
+  planeB.position.z = 0.01;
   root.add(planeA, planeB);
 
-  // soft contact shadow under character
-  const contact = new THREE.Mesh(
-    new THREE.CircleGeometry(0.55, 32),
-    new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.28 }),
-  );
-  contact.rotation.x = -Math.PI / 2;
-  contact.position.y = -1.04;
-  root.add(contact);
-
-  // real 3D pebble for walk behavior
   const pebble = new THREE.Mesh(
-    new THREE.DodecahedronGeometry(0.09, 0),
-    new THREE.MeshStandardMaterial({ color: '#8E877C', roughness: 0.92 }),
+    new THREE.DodecahedronGeometry(0.08, 0),
+    new THREE.MeshStandardMaterial({ color: '#8E877C', roughness: 0.9 }),
   );
-  pebble.position.set(0.55, -1.0, 0.45);
-  pebble.castShadow = true;
+  pebble.position.set(0.62, -0.95, 0.35);
   root.add(pebble);
+  scene.add(new THREE.HemisphereLight('#fff', '#445', 0.4));
 
   const loader = new THREE.TextureLoader();
-  const textures: Partial<Record<Pose, THREE.Texture>> = {};
-  const loadTex = (pose: Pose) =>
-    new Promise<THREE.Texture>((resolve, reject) => {
+  loader.setCrossOrigin('anonymous');
+
+  const textures = {} as Record<Pose, THREE.Texture>;
+  let ready = false;
+  let behavior: Behavior = initialBehavior;
+  let current: Pose = 'idle';
+  let frontA = true;
+  let fading = false;
+  let fadeK = 0;
+  let t = 0;
+  let disposed = false;
+  let raf = 0;
+
+  const applySize = (css: number) => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const px = Math.max(160, Math.floor(css));
+    canvas.style.width = `${px}px`;
+    canvas.style.height = `${px}px`;
+    renderer.setSize(px, px, false);
+    // ensure drawing buffer is non-zero
+    canvas.width = Math.floor(px * dpr);
+    canvas.height = Math.floor(px * dpr);
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(px, px, false);
+    camera.aspect = 1;
+    camera.updateProjectionMatrix();
+  };
+  applySize(cssSize);
+
+  const loadOne = (pose: Pose) =>
+    new Promise<void>((resolve, reject) => {
+      const url = urls[pose];
+      if (!url) {
+        reject(new Error(`missing url ${pose}`));
+        return;
+      }
       loader.load(
-        urls[pose],
+        url,
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
-          tex.minFilter = THREE.LinearFilter;
-          tex.magFilter = THREE.LinearFilter;
+          tex.anisotropy = 4;
           textures[pose] = tex;
-          resolve(tex);
+          resolve();
         },
         undefined,
-        reject,
+        () => reject(new Error(`texture fail ${pose}: ${url}`)),
       );
     });
 
-  let ready = false;
-  let frontIsA = true;
-  let currentPose: Pose = 'idle';
-  let behavior: Behavior = initialBehavior;
-  let t = 0;
-  let poseTimer = 0;
-  let disposed = false;
-  let raf = 0;
-  let fading = false;
-  let fadeT = 0;
-  let pendingPose: Pose | null = null;
-
   Promise.all([
-    loadTex('idle'),
-    loadTex('sleepy'),
-    loadTex('blink'),
-    loadTex('wave'),
-    loadTex('kick'),
-  ]).then(() => {
-    if (disposed) return;
-    matA.map = textures.idle!;
-    matA.needsUpdate = true;
-    ready = true;
-  });
+    loadOne('idle'),
+    loadOne('sleepy'),
+    loadOne('blink'),
+    loadOne('wave'),
+    loadOne('kick'),
+  ])
+    .then(() => {
+      if (disposed) return;
+      matA.map = textures.idle;
+      matA.needsUpdate = true;
+      matA.opacity = 1;
+      ready = true;
+      // force first frame visible
+      renderer.render(scene, camera);
+    })
+    .catch((err) => {
+      console.error('[Nuri3D]', err);
+    });
 
-  const showPose = (pose: Pose) => {
-    if (!ready || pose === currentPose || fading) {
-      pendingPose = pose;
-      return;
-    }
-    const next = textures[pose];
-    if (!next) return;
+  const crossTo = (pose: Pose) => {
+    if (!ready || pose === current || fading) return;
+    const tex = textures[pose];
+    if (!tex) return;
     fading = true;
-    fadeT = 0;
-    pendingPose = null;
-    if (frontIsA) {
-      matB.map = next;
+    fadeK = 0;
+    if (frontA) {
+      matB.map = tex;
       matB.opacity = 0;
       matB.needsUpdate = true;
     } else {
-      matA.map = next;
+      matA.map = tex;
       matA.opacity = 0;
       matA.needsUpdate = true;
     }
-    currentPose = pose;
+    current = pose;
   };
 
-  const setSize = () => {
-    const w = canvas.clientWidth || 320;
-    const h = canvas.clientHeight || 320;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  };
-  setSize();
-
-  const pickPoseForBehavior = (): Pose => {
+  const desiredPose = (): Pose => {
     if (behavior === 'sleepy') return 'sleepy';
     if (behavior === 'walk') return 'kick';
-    if (behavior === 'screen') {
-      // blink rhythm
-      return Math.sin(t * 10) > 0 ? 'blink' : 'idle';
-    }
-    // idle life cycle: mostly idle, occasional blink/wave
-    const cycle = t % 7;
-    if (cycle > 5.6 && cycle < 5.85) return 'blink';
-    if (cycle > 5.85 && cycle < 6.7) return 'wave';
+    if (behavior === 'screen') return Math.sin(t * 9) > 0.15 ? 'blink' : 'idle';
+    const c = t % 7;
+    if (c > 5.55 && c < 5.8) return 'blink';
+    if (c >= 5.8 && c < 6.65) return 'wave';
     return 'idle';
   };
 
@@ -181,76 +160,63 @@ export function mountNuri3D(
     if (disposed) return;
     raf = requestAnimationFrame(tick);
     t += 1 / 60;
-    poseTimer += 1 / 60;
 
-    if (ready) {
-      const desired = pickPoseForBehavior();
-      if (desired !== currentPose && !fading) showPose(desired);
-      if (pendingPose && !fading && pendingPose !== currentPose) showPose(pendingPose);
-    }
+    if (ready) crossTo(desiredPose());
 
-    // crossfade
     if (fading) {
-      fadeT += 1 / 60;
-      const k = Math.min(1, fadeT / 0.18);
-      if (frontIsA) {
-        matA.opacity = 1 - k;
-        matB.opacity = k;
+      fadeK = Math.min(1, fadeK + 1 / 12);
+      if (frontA) {
+        matA.opacity = 1 - fadeK;
+        matB.opacity = fadeK;
       } else {
-        matB.opacity = 1 - k;
-        matA.opacity = k;
+        matB.opacity = 1 - fadeK;
+        matA.opacity = fadeK;
       }
-      if (k >= 1) {
+      if (fadeK >= 1) {
         fading = false;
-        frontIsA = !frontIsA;
-        if (frontIsA) matB.opacity = 0;
+        frontA = !frontA;
+        if (frontA) matB.opacity = 0;
         else matA.opacity = 0;
       }
     }
 
-    // continuous life — same beautiful character always on screen
-    const breath = 1 + Math.sin(t * 2.2) * 0.018;
-    root.scale.set(breath, breath, breath);
-    root.rotation.y = Math.sin(t * 0.7) * 0.06;
-    root.position.y = -0.05 + Math.sin(t * 2.2) * 0.02;
-    contact.scale.setScalar(0.95 + Math.sin(t * 2.2) * 0.04);
+    const breath = 1 + Math.sin(t * 2.15) * 0.02;
+    root.scale.setScalar(breath);
+    root.rotation.y = Math.sin(t * 0.75) * 0.05;
+    root.position.y = Math.sin(t * 2.15) * 0.025;
 
-    // pebble kick when walking
     if (behavior === 'walk') {
-      const cycle = t % 2.0;
-      if (cycle < 0.55) {
-        const k = cycle / 0.55;
-        pebble.position.set(0.55 + k * 1.2, -1.0 + Math.sin(k * Math.PI) * 0.45, 0.45);
-        pebble.rotation.z = k * 5;
-        pebble.visible = true;
+      const k = (t % 2) / 2;
+      if (k < 0.35) {
+        const p = k / 0.35;
+        pebble.position.set(0.62 + p * 1.15, -0.95 + Math.sin(p * Math.PI) * 0.4, 0.35);
+        pebble.rotation.z = p * 5;
       } else {
-        pebble.position.set(0.55, -1.0, 0.45);
+        pebble.position.set(0.62, -0.95, 0.35);
       }
     } else {
-      pebble.position.set(0.55, -1.0, 0.45);
-      pebble.rotation.z = t * 0.2;
+      pebble.position.set(0.62, -0.95, 0.35);
     }
 
     renderer.render(scene, camera);
   };
-
   tick();
 
   return {
     setBehavior: (b) => {
       behavior = b;
-      poseTimer = 0;
     },
+    resize: applySize,
     dispose: () => {
       disposed = true;
       cancelAnimationFrame(raf);
-      renderer.dispose();
-      Object.values(textures).forEach((tex) => tex?.dispose());
+      Object.values(textures).forEach((tex) => tex.dispose());
       geo.dispose();
       matA.dispose();
       matB.dispose();
       pebble.geometry.dispose();
       (pebble.material as THREE.Material).dispose();
+      renderer.dispose();
     },
   };
 }
