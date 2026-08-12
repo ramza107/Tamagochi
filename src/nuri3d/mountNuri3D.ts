@@ -41,7 +41,7 @@ export function mountNuri3D(
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 0.95;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#E8EEF2');
@@ -60,8 +60,8 @@ export function mountNuri3D(
   const rim = new THREE.DirectionalLight('#ffc8b0', 0.4);
   rim.position.set(0.2, 1.0, -2.2);
   scene.add(rim);
-  const heartLight = new THREE.PointLight('#ff9a6a', 0.55, 4.5, 2);
-  heartLight.position.set(0, 0.15, 0.6);
+  const heartLight = new THREE.PointLight('#ff9a6a', 0.25, 4.5, 2);
+  heartLight.position.set(0, 0.05, 0.9);
   scene.add(heartLight);
 
   const stage = new THREE.Group();
@@ -119,15 +119,23 @@ export function mountNuri3D(
           for (const m of mats) {
             const std = m as THREE.MeshStandardMaterial;
             if (std && std.isMeshStandardMaterial) {
-              std.envMapIntensity = 0.85;
-              // Keep amber readable — clamp nuclear emissive from exporters
-              if (std.emissive && std.emissiveIntensity != null) {
-                const name = (std.name || '').toLowerCase();
-                if (name.includes('amber') || name.includes('iris') || name.includes('heart') || name.includes('frill')) {
-                  std.emissiveIntensity = Math.min(Math.max(std.emissiveIntensity, 0.9), 2.6);
-                }
+              std.envMapIntensity = 0.4;
+              if (std.emissiveIntensity != null) {
+                // Prevent white blowout from exported emissive materials
+                std.emissiveIntensity = Math.min(std.emissiveIntensity, 0.35);
+              }
+              // Soft pastel skin — no plastic glare
+              if (std.roughness != null && std.roughness < 0.35) {
+                std.roughness = 0.45;
               }
               std.needsUpdate = true;
+            }
+            const basic = m as THREE.MeshBasicMaterial;
+            if (basic && basic.isMeshBasicMaterial && basic.color) {
+              // tone down pure-white shine sprites
+              if (basic.color.r > 0.95 && basic.color.g > 0.95 && basic.color.b > 0.95) {
+                basic.color.setRGB(0.85, 0.9, 0.95);
+              }
             }
           }
         }
@@ -144,10 +152,10 @@ export function mountNuri3D(
       box.getSize(size);
       box.getCenter(center);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const scale = 1.85 / maxDim;
+      const scale = 1.65 / maxDim;
       modelRoot.scale.setScalar(scale);
       modelRoot.position.sub(center.multiplyScalar(scale));
-      modelRoot.position.y += 0.05;
+      modelRoot.position.y -= 0.05;
       stage.add(modelRoot);
 
       if (gltf.animations?.length) {
