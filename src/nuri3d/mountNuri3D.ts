@@ -1,10 +1,6 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Behavior } from '../logic/behavior';
 
-// Metro resolves these to URLs on web.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const nuriGlb = require('../../assets/nuri3d/nuri.glb');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const idlePng = require('../../assets/nuri3d/cutouts/idle.png');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -36,8 +32,8 @@ function assetUrl(mod: unknown): string {
 }
 
 /**
- * Realtime WebGL Nuri from a Blender relief GLB (beauty cutout as textured mesh).
- * Continuously animated — not React Image, not sphere chibi.
+ * Clean WebGL stage: the beauty cutout as a living textured mesh
+ * (breath / sway / soft crossfades). No sphere chibi. No broken relief GLB.
  */
 export function mountNuri3D(
   canvas: HTMLCanvasElement,
@@ -51,57 +47,71 @@ export function mountNuri3D(
     powerPreference: 'high-performance',
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1.05;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#2B3138');
-  scene.fog = new THREE.Fog('#2B3138', 6, 14);
 
-  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 40);
-  camera.position.set(0, 0.35, 4.2);
-  camera.lookAt(0, 0.15, 0);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 40);
+  camera.position.set(0, 0.05, 3.15);
+  camera.lookAt(0, 0.02, 0);
 
-  scene.add(new THREE.HemisphereLight('#f7f1e8', '#2a3038', 0.95));
-  const key = new THREE.DirectionalLight('#fff6ea', 1.55);
-  key.position.set(2.4, 4.2, 3.2);
-  key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  scene.add(new THREE.AmbientLight('#ffffff', 1.0));
+  const key = new THREE.DirectionalLight('#ffffff', 0.35);
+  key.position.set(1.5, 2.5, 3);
   scene.add(key);
-  const rim = new THREE.DirectionalLight('#9ecbff', 0.45);
-  rim.position.set(-3, 2, -2);
-  scene.add(rim);
-  const fill = new THREE.DirectionalLight('#ffd2a8', 0.35);
-  fill.position.set(-2, 1.2, 2.5);
-  scene.add(fill);
 
-  const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(2.2, 64),
-    new THREE.MeshStandardMaterial({ color: '#3A424C', roughness: 0.95 }),
+  const root = new THREE.Group();
+  scene.add(root);
+
+  // Soft contact shadow
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.72, 48),
+    new THREE.MeshBasicMaterial({ color: '#11151a', transparent: true, opacity: 0.35 }),
   );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -1.05;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = -1.05;
+  root.add(shadow);
 
-  const stage = new THREE.Group();
-  scene.add(stage);
+  const geo = new THREE.PlaneGeometry(2.15, 2.15);
+  const matA = new THREE.MeshBasicMaterial({
+    transparent: true,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const matB = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const planeA = new THREE.Mesh(geo, matA);
+  const planeB = new THREE.Mesh(geo, matB);
+  planeB.position.z = 0.01;
+  root.add(planeA, planeB);
 
+  // Tiny 3D pebble for walk behavior
+  const pebble = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(0.07, 0),
+    new THREE.MeshStandardMaterial({ color: '#8E877C', roughness: 0.92 }),
+  );
+  pebble.position.set(0.55, -0.95, 0.3);
+  root.add(pebble);
+  scene.add(new THREE.HemisphereLight('#fff', '#445', 0.35));
+
+  const loader = new THREE.TextureLoader();
+  const textures = {} as Record<Pose, THREE.Texture>;
+  let ready = false;
   let behavior: Behavior = initialBehavior;
+  let current: Pose = 'idle';
+  let frontA = true;
+  let fading = false;
+  let fadeK = 0;
   let t = 0;
   let disposed = false;
   let raf = 0;
-  let mixer: THREE.AnimationMixer | null = null;
-  let root: THREE.Object3D | null = null;
-  let bodyMat: THREE.MeshStandardMaterial | null = null;
-  let pebble: THREE.Object3D | null = null;
-  const clock = new THREE.Clock();
-
-  const texLoader = new THREE.TextureLoader();
-  const poseTex = {} as Record<Pose, THREE.Texture>;
 
   const applySize = (css: number) => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -115,128 +125,115 @@ export function mountNuri3D(
   };
   applySize(cssSize);
 
-  const loadTex = (pose: Pose, url: string) =>
+  const loadOne = (pose: Pose, url: string) =>
     new Promise<void>((resolve, reject) => {
-      texLoader.load(
+      loader.load(
         url,
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
-          tex.flipY = false;
           tex.anisotropy = 4;
-          poseTex[pose] = tex;
+          tex.premultiplyAlpha = true;
+          textures[pose] = tex;
           resolve();
         },
         undefined,
-        () => reject(new Error(`tex ${pose}`)),
+        () => reject(new Error(`texture ${pose}`)),
       );
     });
 
-  const setPose = (pose: Pose) => {
-    if (!bodyMat || !poseTex[pose]) return;
-    bodyMat.map = poseTex[pose];
-    bodyMat.needsUpdate = true;
+  Promise.all([
+    loadOne('idle', assetUrl(idlePng)),
+    loadOne('sleepy', assetUrl(sleepyPng)),
+    loadOne('blink', assetUrl(blinkPng)),
+    loadOne('wave', assetUrl(wavePng)),
+    loadOne('kick', assetUrl(kickPng)),
+  ])
+    .then(() => {
+      if (disposed) return;
+      matA.map = textures.idle;
+      matA.needsUpdate = true;
+      matA.opacity = 1;
+      ready = true;
+      renderer.render(scene, camera);
+    })
+    .catch((err) => console.error('[Nuri3D]', err));
+
+  const crossTo = (pose: Pose) => {
+    if (!ready || pose === current || fading) return;
+    const tex = textures[pose];
+    if (!tex) return;
+    fading = true;
+    fadeK = 0;
+    if (frontA) {
+      matB.map = tex;
+      matB.opacity = 0;
+      matB.needsUpdate = true;
+    } else {
+      matA.map = tex;
+      matA.opacity = 0;
+      matA.needsUpdate = true;
+    }
+    current = pose;
   };
 
   const desiredPose = (): Pose => {
     if (behavior === 'sleepy') return 'sleepy';
     if (behavior === 'walk') return 'kick';
-    if (behavior === 'screen') return Math.sin(t * 10) > 0.2 ? 'blink' : 'idle';
-    const c = t % 7.2;
-    if (c > 5.6 && c < 5.85) return 'blink';
-    if (c >= 5.85 && c < 6.7) return 'wave';
+    if (behavior === 'screen') return Math.sin(t * 9) > 0.15 ? 'blink' : 'idle';
+    const c = t % 7;
+    if (c > 5.55 && c < 5.8) return 'blink';
+    if (c >= 5.8 && c < 6.65) return 'wave';
     return 'idle';
   };
-
-  Promise.all([
-    loadTex('idle', assetUrl(idlePng)),
-    loadTex('sleepy', assetUrl(sleepyPng)),
-    loadTex('blink', assetUrl(blinkPng)),
-    loadTex('wave', assetUrl(wavePng)),
-    loadTex('kick', assetUrl(kickPng)),
-    new Promise<void>((resolve, reject) => {
-      const loader = new GLTFLoader();
-      loader.load(
-        assetUrl(nuriGlb),
-        (gltf) => {
-          if (disposed) return;
-          root = gltf.scene;
-          root.traverse((obj) => {
-            if ((obj as THREE.Mesh).isMesh) {
-              const mesh = obj as THREE.Mesh;
-              mesh.castShadow = true;
-              mesh.receiveShadow = true;
-              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-              mats.forEach((m) => {
-                const mat = m as THREE.MeshStandardMaterial;
-                if (mat.map) {
-                  mat.map.colorSpace = THREE.SRGBColorSpace;
-                  mat.map.flipY = false;
-                  bodyMat = mat;
-                  mat.transparent = true;
-                  mat.alphaTest = 0.12;
-                }
-                if (mat.emissive) {
-                  mat.emissiveIntensity = Math.max(mat.emissiveIntensity ?? 0, 0.8);
-                }
-              });
-            }
-            if (obj.name === 'Pebble') pebble = obj;
-          });
-          root.scale.setScalar(1.15);
-          root.position.y = -0.15;
-          stage.add(root);
-
-          if (gltf.animations?.length) {
-            mixer = new THREE.AnimationMixer(root);
-            gltf.animations.forEach((clip) => {
-              const action = mixer!.clipAction(clip);
-              action.play();
-            });
-          }
-          setPose('idle');
-          resolve();
-        },
-        undefined,
-        (err) => reject(err),
-      );
-    }),
-  ]).catch((e) => console.error('[Nuri3D]', e));
-
-  let lastPose: Pose = 'idle';
 
   const tick = () => {
     if (disposed) return;
     raf = requestAnimationFrame(tick);
-    const dt = clock.getDelta();
-    t += dt;
-    mixer?.update(dt);
+    t += 1 / 60;
 
-    const pose = desiredPose();
-    if (pose !== lastPose) {
-      setPose(pose);
-      lastPose = pose;
+    if (ready) crossTo(desiredPose());
+
+    if (fading) {
+      fadeK = Math.min(1, fadeK + 1 / 14);
+      if (frontA) {
+        matA.opacity = 1 - fadeK;
+        matB.opacity = fadeK;
+      } else {
+        matB.opacity = 1 - fadeK;
+        matA.opacity = fadeK;
+      }
+      if (fadeK >= 1) {
+        fading = false;
+        frontA = !frontA;
+        if (frontA) matB.opacity = 0;
+        else matA.opacity = 0;
+      }
     }
 
-    // Extra live motion on top of GLB clips
-    stage.rotation.y = Math.sin(t * 0.7) * 0.08;
-    stage.position.y = Math.sin(t * 2.1) * 0.02;
     const breath = 1 + Math.sin(t * 2.15) * 0.018;
-    stage.scale.set(breath, breath, breath);
+    root.scale.set(breath, breath, 1);
+    root.rotation.y = Math.sin(t * 0.7) * 0.06;
+    root.position.y = Math.sin(t * 2.15) * 0.02;
+    shadow.scale.set(1 / breath, 1, 1);
+    shadow.material.opacity = 0.28 + Math.sin(t * 2.15) * 0.04;
+
+    if (behavior === 'walk') {
+      const k = (t % 2) / 2;
+      if (k < 0.35) {
+        const p = k / 0.35;
+        pebble.position.set(0.55 + p * 1.1, -0.95 + Math.sin(p * Math.PI) * 0.4, 0.3);
+        pebble.rotation.z = p * 5;
+      } else {
+        pebble.position.set(0.55, -0.95, 0.3);
+      }
+    } else {
+      pebble.position.set(0.55, -0.95, 0.3);
+    }
 
     if (behavior === 'sleepy') {
-      stage.rotation.x = 0.12 + Math.sin(t * 1.1) * 0.04;
+      root.rotation.x = 0.06 + Math.sin(t * 1.1) * 0.02;
     } else {
-      stage.rotation.x = Math.sin(t * 0.9) * 0.02;
-    }
-
-    if (behavior === 'walk' && pebble) {
-      const k = (t % 2) / 2;
-      if (k < 0.4) {
-        const p = k / 0.4;
-        pebble.position.x = 0.5 + p * 1.1;
-        pebble.position.z = -0.9 + Math.sin(p * Math.PI) * 0.45;
-        pebble.rotation.z = p * 5;
-      }
+      root.rotation.x = 0;
     }
 
     renderer.render(scene, camera);
@@ -251,18 +248,15 @@ export function mountNuri3D(
     dispose: () => {
       disposed = true;
       cancelAnimationFrame(raf);
-      mixer?.stopAllAction();
-      Object.values(poseTex).forEach((tex) => tex.dispose());
+      Object.values(textures).forEach((tex) => tex.dispose());
+      geo.dispose();
+      matA.dispose();
+      matB.dispose();
+      pebble.geometry.dispose();
+      (pebble.material as THREE.Material).dispose();
+      shadow.geometry.dispose();
+      (shadow.material as THREE.Material).dispose();
       renderer.dispose();
-      scene.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh) {
-          const mesh = obj as THREE.Mesh;
-          mesh.geometry?.dispose();
-          const m = mesh.material;
-          if (Array.isArray(m)) m.forEach((x) => x.dispose());
-          else m?.dispose();
-        }
-      });
     },
   };
 }
