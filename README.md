@@ -4,20 +4,22 @@
 
 ## Открыть в браузере
 
-**Ссылка:** https://ramza107.github.io/Tamagochi/
+**Рабочая ссылка:** https://ramza107.github.io/Tamagochi/
 
-### Если сайт не открывается (404)
+Если страница пустая — сделай **hard refresh**: `Ctrl+Shift+R` (на телефоне открой в Private/Incognito).
 
-В https://github.com/ramza107/Tamagochi/settings/pages поставь:
+### Настройки GitHub Pages
+
+Сейчас сайт берётся из ветки **`cursor/pulsepet-mvp-249e`**, папка **`/docs`**.
+
+В https://github.com/ramza107/Tamagochi/settings/pages:
 
 1. Source: **Deploy from a branch**
-2. Branch: **`gh-pages`**
-3. Folder: **`/ (root)`**
+2. Branch: **`cursor/pulsepet-mvp-249e`**
+3. Folder: **`/docs`**
 4. Save
 
-Подожди 1–2 минуты и обнови страницу (лучше Ctrl+Shift+R).
-
-Альтернатива: branch `cursor/pulsepet-mvp-249e`, folder **`/docs`**.
+(Альтернатива: branch `gh-pages`, folder `/ (root)` — тоже поддерживается.)
 
 ## Локально
 
@@ -28,4 +30,4 @@ npm run web
 
 ## Идея
 
-**Nuri** — мягкий моховый камешек с янтарным «ядром-пульсом». Сон, шаги и экранное время меняют цвет, позу и письма.
+**Nuri** — мягкий моховый камешек с янтарным «ядром-пульсом». Сон, шаги и экранное время меняют поведение и письма.
