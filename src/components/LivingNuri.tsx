@@ -16,7 +16,7 @@ type Handle = {
   dispose: () => void;
 };
 
-/** Realtime WebGL Nuri — beauty relief GLB, continuously animated. */
+/** Realtime WebGL Nuri — cute polished GLB character, continuously animated. */
 export function LivingNuri({ behavior, size = 320 }: Props) {
   const hostRef = useRef<View>(null);
   const handleRef = useRef<Handle | null>(null);
