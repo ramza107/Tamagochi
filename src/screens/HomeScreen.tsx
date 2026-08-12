@@ -116,7 +116,7 @@ export function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
             <Text style={styles.brand}>Pulsepet</Text>
-            <Text style={styles.tagline}>Один живой Nuri. Он двигается и просит заботы.</Text>
+            <Text style={styles.tagline}>Полноценный 3D-герой — как Talking Ben, только Nuri.</Text>
           </View>
 
           <View style={styles.stage}>
@@ -141,8 +141,8 @@ export function HomeScreen() {
           </View>
 
           <Text style={styles.guide}>
-            Мало сна → клонит в сон. Много экрана → моргает и закрывает глаза. Мало шагов → пинает
-            камушек.
+            Мало сна → засыпает. Много экрана → закрывает глаза. Мало шагов → пинает камушек.
+            В покое сам моргает и машет.
           </Text>
 
           <ShopPanel
