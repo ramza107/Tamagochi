@@ -47,8 +47,9 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
       try {
         const { mountNuri3D } = await import('../nuri3d/mountNuri3D');
         if (cancelled) return;
-        handleRef.current = mountNuri3D(canvas, size, behavior);
-        setWebglOk(true);
+        handleRef.current = mountNuri3D(canvas, size, behavior, () => {
+          if (!cancelled) setWebglOk(true);
+        });
       } catch (e) {
         console.error('[LivingNuri]', e);
         setWebglOk(false);
