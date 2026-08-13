@@ -132,11 +132,16 @@ export function mountNuri3D(
             std.map.anisotropy = 8;
           }
           std.transparent = true;
-          std.alphaTest = 0.12;
+          std.alphaTest = 0.22;
           std.depthWrite = true;
-          std.roughness = Math.min(std.roughness ?? 0.55, 0.62);
+          std.side = THREE.FrontSide;
+          std.roughness = Math.min(std.roughness ?? 0.55, 0.58);
           std.metalness = 0;
-          std.envMapIntensity = 0.35;
+          std.envMapIntensity = 0.25;
+          // Avoid white sparkle from leftover fringe
+          if (std.map) {
+            std.map.premultiplyAlpha = false;
+          }
           std.needsUpdate = true;
         }
       });
