@@ -4,7 +4,7 @@ import type { Behavior } from '../logic/behavior';
 import type { Equipped } from '../shop/catalog';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const idleCutout = require('../../assets/nuri3d/nuri_preview.png');
+const dragonPng = require('../../assets/nuri3d/cutouts/dragon.png');
 
 type Props = {
   behavior: Behavior;
@@ -19,10 +19,7 @@ type Handle = {
   dispose: () => void;
 };
 
-/**
- * WebGL GLB Nuri with an always-visible beauty cutout underneath,
- * so the stage is never an empty dark box if WebGL/GLB fails.
- */
+/** Living WebGL Nuri — one continuous beauty cutout, not sphere blobs. */
 export function LivingNuri({ behavior, size = 320 }: Props) {
   const hostRef = useRef<View>(null);
   const handleRef = useRef<Handle | null>(null);
@@ -44,7 +41,6 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
       canvas.style.borderRadius = '28px';
       canvas.style.position = 'absolute';
       canvas.style.inset = '0';
-      // clear only previous canvases, keep layout
       node.querySelectorAll('canvas').forEach((c) => c.remove());
       node.appendChild(canvas);
 
@@ -86,14 +82,6 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
     handleRef.current?.resize(size);
   }, [size]);
 
-  if (Platform.OS !== 'web') {
-    return (
-      <View style={[styles.fallback, { width: size, height: size }]}>
-        <Image source={idleCutout} style={{ width: size, height: size }} resizeMode="contain" />
-      </View>
-    );
-  }
-
   return (
     <View
       style={{
@@ -104,39 +92,27 @@ export function LivingNuri({ behavior, size = 320 }: Props) {
         backgroundColor: '#E8EEF2',
       }}
     >
-      {/* Always-on beauty poster so stage is never empty */}
       <Image
-        source={idleCutout}
-        style={[
-          StyleSheet.absoluteFillObject,
-          { width: size, height: size, opacity: webglOk ? 0 : 1 },
-        ]}
+        source={dragonPng}
+        style={[StyleSheet.absoluteFillObject, { width: size, height: size, opacity: webglOk ? 0 : 1 }]}
         resizeMode="contain"
       />
-      <View ref={hostRef} style={StyleSheet.absoluteFillObject} />
-      {!webglOk ? (
-        <Text style={styles.loadingHint}>Загрузка 3D Nuri…</Text>
+      {Platform.OS === 'web' ? <View ref={hostRef} style={StyleSheet.absoluteFillObject} /> : null}
+      {!webglOk && Platform.OS === 'web' ? (
+        <Text style={styles.loadingHint}>Загрузка Nuri…</Text>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: '#2B3138',
-  },
   loadingHint: {
     position: 'absolute',
     bottom: 12,
-    alignSelf: 'center',
     left: 0,
     right: 0,
     textAlign: 'center',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(60,70,80,0.55)',
     fontFamily: 'Manrope_500Medium',
     fontSize: 12,
   },
