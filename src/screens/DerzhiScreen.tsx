@@ -56,9 +56,14 @@ export function DerzhiScreen() {
   const rafRef = useRef(0);
   const finished = useRef(false);
   const practiceRef = useRef(false);
+  const phaseRef = useRef<Phase>('boot');
+  const playedTodayRef = useRef(false);
+  const currentFromRef = useRef<string | null>(null);
+  const startHoldRef = useRef<() => void>(() => undefined);
+  const endHoldRef = useRef<() => void>(() => undefined);
   const pulse = useRef(new Animated.Value(1)).current;
-  const shake = useRef(new Animated.Value(0)).current;
   const lastTrapId = useRef<string | null>(null);
+  phaseRef.current = phase;
 
   useEffect(() => {
     let live = true;
@@ -104,8 +109,10 @@ export function DerzhiScreen() {
   }, [pulse]);
 
   const playedToday = official?.dateISO === run.dateISO;
+  playedTodayRef.current = playedToday;
   const activeTraps = run.deck.filter((t) => elapsed >= t.atMs);
   const current = activeTraps.length ? activeTraps[activeTraps.length - 1] : null;
+  currentFromRef.current = current?.from ?? null;
   const shown = activeTraps.slice(-2);
 
   const finish = useCallback(
@@ -141,39 +148,108 @@ export function DerzhiScreen() {
     const trap = [...run.deck].reverse().find((t) => ms >= t.atMs) ?? null;
     if (trap && trap.id !== lastTrapId.current) {
       lastTrapId.current = trap.id;
+      currentFromRef.current = trap.from;
       buzz('trap');
-      shake.setValue(1);
-      Animated.timing(shake, { toValue: 0, duration: 280, useNativeDriver: true }).start();
     }
     if (ms >= run.winMs) {
       finish(run.winMs, true);
       return;
     }
     rafRef.current = requestAnimationFrame(tick);
-  }, [finish, run.deck, run.winMs, shake]);
+  }, [finish, run.deck, run.winMs]);
 
   const onDown = () => {
-    if (phase === 'boot' || phase === 'result') return;
-    const isPractice = playedToday;
+    if (phaseRef.current === 'boot' || phaseRef.current === 'result') return;
+    if (holding.current) return;
+    const isPractice = playedTodayRef.current;
     practiceRef.current = isPractice;
     setPractice(isPractice);
     finished.current = false;
     holding.current = true;
     startRef.current = performance.now();
     lastTrapId.current = null;
+    currentFromRef.current = null;
     setElapsed(0);
     setShareHint('');
     setPhase('live');
     buzz('start');
+    cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(tick);
   };
 
   const onUp = () => {
-    if (!holding.current || phase !== 'live') return;
+    if (!holding.current) return;
     const ms = performance.now() - startRef.current;
-    const killer = current?.from ?? 'палец';
+    const killer = currentFromRef.current ?? 'палец';
     finish(ms, false, killer);
   };
+
+  startHoldRef.current = onDown;
+  endHoldRef.current = onUp;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    let cancelled = false;
+    let unbind: (() => void) | undefined;
+
+    const bind = () => {
+      if (cancelled) return;
+      const el = document.getElementById('derzhi-pad');
+      if (!el) {
+        requestAnimationFrame(bind);
+        return;
+      }
+
+      el.style.touchAction = 'none';
+      el.style.userSelect = 'none';
+      const css = el.style as CSSStyleDeclaration & { webkitTouchCallout?: string; webkitUserSelect?: string };
+      css.webkitTouchCallout = 'none';
+      css.webkitUserSelect = 'none';
+
+      const down = (e: PointerEvent) => {
+        if (e.button != null && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          /* unsupported */
+        }
+        const pointerId = e.pointerId;
+        startHoldRef.current();
+        const release = (ev: PointerEvent) => {
+          if (ev.pointerId !== pointerId) return;
+          if (ev.type === 'pointercancel' && document.visibilityState === 'visible') return;
+          window.removeEventListener('pointerup', release, true);
+          window.removeEventListener('pointercancel', release, true);
+          endHoldRef.current();
+        };
+        window.addEventListener('pointerup', release, true);
+        window.addEventListener('pointercancel', release, true);
+      };
+      const blockMenu = (e: Event) => e.preventDefault();
+      const onHide = () => {
+        if (document.visibilityState === 'hidden') endHoldRef.current();
+      };
+
+      el.addEventListener('pointerdown', down);
+      el.addEventListener('contextmenu', blockMenu);
+      el.addEventListener('selectstart', blockMenu);
+      document.addEventListener('visibilitychange', onHide);
+      unbind = () => {
+        el.removeEventListener('pointerdown', down);
+        el.removeEventListener('contextmenu', blockMenu);
+        el.removeEventListener('selectstart', blockMenu);
+        document.removeEventListener('visibilitychange', onHide);
+      };
+    };
+
+    bind();
+    return () => {
+      cancelled = true;
+      unbind?.();
+    };
+  }, []);
 
   const onShare = async () => {
     const res = result ?? (playedToday ? official : null);
@@ -215,37 +291,30 @@ export function DerzhiScreen() {
           : null}
       </View>
 
-      <Animated.View
-        style={{
-          transform: [
-            { scale: pulse },
-            {
-              translateX: shake.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 11],
-              }),
-            },
-          ],
-        }}
+      <View
+        nativeID="derzhi-pad"
+        collapsable={false}
+        // @ts-expect-error web host id so pointer capture can bind
+        id="derzhi-pad"
+        onStartShouldSetResponder={() => Platform.OS !== 'web'}
+        onResponderGrant={onDown}
+        onResponderRelease={onUp}
+        onResponderTerminate={onUp}
+        style={[
+          styles.pad,
+          phase === 'live' && styles.padLive,
+          phase === 'result' && styles.padDead,
+        ]}
       >
-        <Pressable
-          onPressIn={onDown}
-          onPressOut={onUp}
-          disabled={phase === 'boot' || phase === 'result'}
-          style={({ pressed }) => [
-            styles.pad,
-            (pressed || phase === 'live') && styles.padLive,
-            phase === 'result' && styles.padDead,
-          ]}
-        >
+        <Animated.View pointerEvents="none" style={{ transform: [{ scale: pulse }] }}>
           <Text style={[styles.padTitle, phase === 'live' && styles.padTitleLive]}>
             {phase === 'live' ? 'ДЕРЖИ' : 'зажми'}
           </Text>
           <Text style={[styles.padSub, phase === 'live' && styles.padSubLive]}>
             {phase === 'result' ? 'замер окончен' : playedToday && phase === 'idle' ? 'тренировка' : 'и не отпускай'}
           </Text>
-        </Pressable>
-      </Animated.View>
+        </Animated.View>
+      </View>
 
       {phase === 'result' && shownResult ? (
         <View style={styles.result}>
@@ -396,6 +465,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
+    userSelect: 'none',
   },
   padLive: {
     backgroundColor: ink.lime,
