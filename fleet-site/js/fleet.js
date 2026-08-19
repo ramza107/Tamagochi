@@ -1,5 +1,5 @@
-const STORAGE_KEY = "abc-fleet-data-v1";
-const SESSION_KEY = "abc-fleet-admin";
+const STORAGE_KEY = "transcargo-fleet-data-v1";
+const SESSION_KEY = "transcargo-fleet-admin";
 
 function generateId() {
   return `truck-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;

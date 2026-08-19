@@ -1,6 +1,6 @@
-# American Box & Conestoga Co. — Fleet Site
+# Transcargo — Fleet Site
 
-Static business-card website for a US trucking carrier specializing in **26′ box trucks** and **16′ Conestoga** trailers.
+Static business-card website for **Transcargo** — US trucking carrier (HQ Las Vegas, NV) specializing in **26′ box trucks** and **16′ Conestoga** trailers nationwide.
 
 ## Features
 

@@ -1,14 +1,14 @@
 /** Site & admin configuration — change company details and admin password here. */
 window.FLEET_CONFIG = {
   company: {
-    name: "American Box & Conestoga Co.",
-    shortName: "AB&C Freight",
-    tagline: "Specialized 26′ box trucks & 16′ Conestoga trailers nationwide",
+    name: "Transcargo",
+    shortName: "Transcargo Logistics",
+    tagline: "26′ box trucks & 16′ Conestoga trailers — HQ in Las Vegas, serving all 50 states",
     phone: "(888) 555-0142",
-    email: "dispatch@abcfreight.com",
+    email: "dispatch@transcargo.com",
     mcNumber: "MC-482917",
     dotNumber: "DOT 3891042",
-    headquarters: "Kansas City, MO",
+    headquarters: "Las Vegas, NV",
   },
   equipment: {
     "box-26": {
