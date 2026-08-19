@@ -1,0 +1,60 @@
+{
+  "updatedAt": "2026-08-19T12:00:00.000Z",
+  "trucks": [
+    {
+      "id": "tx-dallas-01",
+      "city": "Dallas",
+      "state": "TX",
+      "lat": 32.7767,
+      "lng": -96.797,
+      "equipment": "box-26",
+      "readyDate": "2026-08-20",
+      "status": "available",
+      "notes": "Liftgate, pallet jack on board"
+    },
+    {
+      "id": "il-chicago-01",
+      "city": "Chicago",
+      "state": "IL",
+      "lat": 41.8781,
+      "lng": -87.6298,
+      "equipment": "conestoga-16",
+      "readyDate": "2026-08-21",
+      "status": "available",
+      "notes": "Tarps inspected, straps included"
+    },
+    {
+      "id": "ga-atlanta-01",
+      "city": "Atlanta",
+      "state": "GA",
+      "lat": 33.749,
+      "lng": -84.388,
+      "equipment": "box-26",
+      "readyDate": "2026-08-22",
+      "status": "available",
+      "notes": "Dock-high, team drivers OK"
+    },
+    {
+      "id": "ca-losangeles-01",
+      "city": "Los Angeles",
+      "state": "CA",
+      "lat": 34.0522,
+      "lng": -118.2437,
+      "equipment": "conestoga-16",
+      "readyDate": "2026-08-23",
+      "status": "available",
+      "notes": "West coast reload preferred"
+    },
+    {
+      "id": "oh-columbus-01",
+      "city": "Columbus",
+      "state": "OH",
+      "lat": 39.9612,
+      "lng": -82.9988,
+      "equipment": "box-26",
+      "readyDate": "2026-08-19",
+      "status": "available",
+      "notes": "Ready today — empty now"
+    }
+  ]
+}
