@@ -1,5 +1,4 @@
 const STORAGE_KEY = "transcargo-fleet-data-v1";
-const SESSION_KEY = "transcargo-fleet-admin";
 
 function generateId() {
   return `truck-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -26,6 +25,11 @@ function equipmentColor(type) {
 }
 
 async function loadFleetData() {
+  if (isFirebaseEnabled()) {
+    initFirebase();
+    return loadFleetFromFirestore();
+  }
+
   const cached = readCachedFleet();
   if (cached?.trucks?.length) {
     return cached;
@@ -50,13 +54,55 @@ function readCachedFleet() {
   }
 }
 
-function saveFleetData(data) {
+function saveFleetDataLocal(data) {
   const payload = {
     ...data,
     updatedAt: new Date().toISOString(),
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   return payload;
+}
+
+async function saveFleetData(data) {
+  if (isFirebaseEnabled()) {
+    return data;
+  }
+  return saveFleetDataLocal(data);
+}
+
+async function persistTruck(truck) {
+  if (isFirebaseEnabled()) {
+    await saveTruckToCloud(truck);
+    return null;
+  }
+
+  const index = window.fleetData.trucks.findIndex((item) => item.id === truck.id);
+  if (index >= 0) {
+    window.fleetData.trucks[index] = truck;
+  } else {
+    window.fleetData.trucks.push(truck);
+  }
+  return saveFleetDataLocal(window.fleetData);
+}
+
+async function removeTruck(id) {
+  if (isFirebaseEnabled()) {
+    await deleteTruckFromCloud(id);
+    return null;
+  }
+
+  window.fleetData.trucks = window.fleetData.trucks.filter((item) => item.id !== id);
+  return saveFleetDataLocal(window.fleetData);
+}
+
+async function replaceAllTrucks(trucks) {
+  if (isFirebaseEnabled()) {
+    await clearAllTrucksFromCloud();
+    await importTrucksToCloud(trucks);
+    return null;
+  }
+
+  return saveFleetDataLocal({ trucks, updatedAt: new Date().toISOString() });
 }
 
 function exportFleetJson(data) {
@@ -67,18 +113,6 @@ function exportFleetJson(data) {
   anchor.download = "fleet.json";
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-function isAdminLoggedIn() {
-  return sessionStorage.getItem(SESSION_KEY) === "1";
-}
-
-function setAdminLoggedIn(value) {
-  if (value) {
-    sessionStorage.setItem(SESSION_KEY, "1");
-  } else {
-    sessionStorage.removeItem(SESSION_KEY);
-  }
 }
 
 async function reverseGeocode(lat, lng) {
@@ -102,6 +136,21 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
+function updateSyncStatus() {
+  const el = document.querySelector("#sync-status");
+  if (!el) return;
+
+  if (isFirebaseEnabled()) {
+    el.textContent = isAdminLoggedIn()
+      ? "Live cloud sync · you are signed in"
+      : "Live cloud sync · map updates automatically";
+    el.classList.add("sync-live");
+  } else {
+    el.textContent = "Demo mode · changes stay in this browser only";
+    el.classList.remove("sync-live");
+  }
+}
+
 window.FleetStore = {
   STORAGE_KEY,
   generateId,
@@ -110,10 +159,13 @@ window.FleetStore = {
   equipmentColor,
   loadFleetData,
   saveFleetData,
+  persistTruck,
+  removeTruck,
+  replaceAllTrucks,
   exportFleetJson,
-  isAdminLoggedIn,
-  setAdminLoggedIn,
   reverseGeocode,
+  updateSyncStatus,
 };
 
 Object.assign(window, window.FleetStore);
+Object.assign(window, window.FleetFirebase);

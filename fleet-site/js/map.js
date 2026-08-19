@@ -117,8 +117,18 @@ function refreshFleetViews(data) {
 }
 
 async function bootstrapFleet() {
+  if (isFirebaseEnabled()) {
+    initFirebase();
+    subscribeFleetUpdates((data) => {
+      refreshFleetViews(data);
+      updateSyncStatus();
+    });
+    return;
+  }
+
   const data = await loadFleetData();
   refreshFleetViews(data);
+  updateSyncStatus();
 }
 
 function selectTruckForEdit(id) {
@@ -178,7 +188,7 @@ function validateTruck(truck) {
   return null;
 }
 
-function saveTruckFromForm() {
+async function saveTruckFromForm() {
   const truck = readTruckForm();
   const error = validateTruck(truck);
   if (error) {
@@ -186,26 +196,39 @@ function saveTruckFromForm() {
     return;
   }
 
-  const index = window.fleetData.trucks.findIndex((item) => item.id === truck.id);
-  if (index >= 0) {
-    window.fleetData.trucks[index] = truck;
-  } else {
-    window.fleetData.trucks.push(truck);
-  }
+  const saveBtn = document.querySelector("#btn-save-truck");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
 
-  const saved = saveFleetData(window.fleetData);
-  refreshFleetViews(saved);
-  clearTruckForm();
-  document.querySelector("#admin-form-title").textContent = "Add or edit truck";
+  try {
+    const saved = await persistTruck(truck);
+    if (saved) refreshFleetViews(saved);
+    clearTruckForm();
+    document.querySelector("#admin-form-title").textContent = "Add or edit truck";
+    if (isFirebaseEnabled()) {
+      alert("Saved — everyone can see this truck now.");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Could not save truck. Check internet and try again.");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save truck";
+  }
 }
 
-function deleteSelectedTruck() {
+async function deleteSelectedTruck() {
   if (!selectedTruckId) return;
   if (!confirm("Delete this truck from the map?")) return;
-  window.fleetData.trucks = window.fleetData.trucks.filter((item) => item.id !== selectedTruckId);
-  const saved = saveFleetData(window.fleetData);
-  refreshFleetViews(saved);
-  clearTruckForm();
+
+  try {
+    const saved = await removeTruck(selectedTruckId);
+    if (saved) refreshFleetViews(saved);
+    clearTruckForm();
+  } catch (err) {
+    console.error(err);
+    alert("Could not delete truck. Check internet and try again.");
+  }
 }
 
 function renderAdminList() {
@@ -231,14 +254,14 @@ function renderAdminList() {
   });
 }
 
-function importFleetJson(file) {
+async function importFleetJson(file) {
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const parsed = JSON.parse(reader.result);
       if (!Array.isArray(parsed.trucks)) throw new Error("Invalid fleet.json");
-      const saved = saveFleetData(parsed);
-      refreshFleetViews(saved);
+      const saved = await replaceAllTrucks(parsed.trucks);
+      if (saved) refreshFleetViews(saved);
       alert("Fleet imported successfully.");
     } catch (error) {
       alert(`Import failed: ${error.message}`);
@@ -247,7 +270,26 @@ function importFleetJson(file) {
   reader.readAsText(file);
 }
 
+async function clearAllTrucks() {
+  if (!confirm("Remove ALL trucks from the map? Use this each morning before adding today's fleet.")) {
+    return;
+  }
+
+  try {
+    const saved = await replaceAllTrucks([]);
+    if (saved) refreshFleetViews(saved);
+    clearTruckForm();
+  } catch (err) {
+    console.error(err);
+    alert("Could not clear fleet. Check internet and try again.");
+  }
+}
+
 function resetFleetFromServer() {
+  if (isFirebaseEnabled()) {
+    alert("Cloud mode is on — the map already syncs automatically.");
+    return;
+  }
   if (!confirm("Reset to default fleet.json from server? Local changes will be lost.")) return;
   localStorage.removeItem(STORAGE_KEY);
   bootstrapFleet();
@@ -262,6 +304,7 @@ window.FleetMap = {
   clearTruckForm,
   importFleetJson,
   resetFleetFromServer,
+  clearAllTrucks,
   openAdminModal: () => document.querySelector("#admin-modal")?.classList.add("open"),
 };
 

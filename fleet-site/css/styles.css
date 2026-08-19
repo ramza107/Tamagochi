@@ -297,6 +297,17 @@ img {
   color: var(--muted);
 }
 
+.sync-status {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.sync-status.sync-live {
+  color: var(--success);
+  font-weight: 600;
+}
+
 .fleet-table-wrap {
   margin-top: 1.25rem;
   overflow-x: auto;
