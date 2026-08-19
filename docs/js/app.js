@@ -22,6 +22,30 @@ function applyCompanyBranding() {
   if (mailLink) mailLink.href = `mailto:${cfg.email}`;
   const phoneLink = document.querySelector("#contact-phone-link");
   if (phoneLink) phoneLink.href = `tel:${cfg.phone.replace(/\D/g, "")}`;
+
+  const emailInput = document.querySelector("#admin-email");
+  if (emailInput && window.FLEET_CONFIG.adminEmail) {
+    emailInput.placeholder = window.FLEET_CONFIG.adminEmail;
+    emailInput.value = window.FLEET_CONFIG.adminEmail;
+  }
+
+  toggleLegacyAdminTools();
+  document.querySelector("#admin-email-field")?.classList.toggle("hidden", !isFirebaseEnabled());
+}
+
+function toggleLegacyAdminTools() {
+  const legacy = !isFirebaseEnabled();
+  document.querySelector("#btn-export-fleet")?.classList.toggle("hidden", !legacy);
+  document.querySelector("#btn-import-fleet")?.classList.toggle("hidden", !legacy);
+  document.querySelector("#btn-reset-fleet")?.classList.toggle("hidden", !legacy);
+  document.querySelector("#btn-clear-all-trucks")?.classList.toggle("hidden", legacy);
+
+  const hint = document.querySelector("#admin-hint-text");
+  if (hint) {
+    hint.innerHTML = legacy
+      ? 'Demo mode: changes stay in this browser only. For daily updates without GitHub, enable Firebase (see <code>SETUP-RU.md</code>).'
+      : "<strong>Morning routine:</strong> sign in → click the map to add trucks → set ready dates → Save. Changes appear for everyone instantly. Use <strong>Clear all trucks</strong> to reset the map each morning.";
+  }
 }
 
 function bindUiEvents() {
@@ -38,16 +62,34 @@ function bindUiEvents() {
     }
   });
 
-  document.querySelector("#login-form")?.addEventListener("submit", (event) => {
+  document.querySelector("#login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const password = document.querySelector("#admin-password").value;
-    if (password === window.FLEET_CONFIG.adminPassword) {
-      setAdminLoggedIn(true);
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      if (isFirebaseEnabled()) {
+        const email = document.querySelector("#admin-email").value;
+        const password = document.querySelector("#admin-password").value;
+        await loginAdmin(email, password);
+      } else {
+        const password = document.querySelector("#admin-password").value;
+        if (password !== window.FLEET_CONFIG.adminPassword) {
+          alert("Incorrect password.");
+          return;
+        }
+        setAdminLoggedIn(true);
+      }
+
       document.querySelector("#login-modal")?.classList.remove("open");
       document.querySelector("#admin-password").value = "";
+      updateSyncStatus();
       openAdminModal();
-    } else {
-      alert("Incorrect password.");
+    } catch (error) {
+      console.error(error);
+      alert("Login failed. Check email and password.");
+    } finally {
+      submitBtn.disabled = false;
     }
   });
 
@@ -57,8 +99,12 @@ function bindUiEvents() {
     });
   });
 
-  document.querySelector("#btn-save-truck")?.addEventListener("click", saveTruckFromForm);
-  document.querySelector("#btn-delete-truck")?.addEventListener("click", deleteSelectedTruck);
+  document.querySelector("#btn-save-truck")?.addEventListener("click", () => {
+    saveTruckFromForm();
+  });
+  document.querySelector("#btn-delete-truck")?.addEventListener("click", () => {
+    deleteSelectedTruck();
+  });
   document.querySelector("#btn-new-truck")?.addEventListener("click", () => {
     clearTruckForm();
     document.querySelector("#admin-form-title").textContent = "Add new truck";
@@ -79,17 +125,30 @@ function bindUiEvents() {
   });
 
   document.querySelector("#btn-reset-fleet")?.addEventListener("click", resetFleetFromServer);
+  document.querySelector("#btn-clear-all-trucks")?.addEventListener("click", clearAllTrucks);
 
-  document.querySelector("#btn-admin-logout")?.addEventListener("click", () => {
-    setAdminLoggedIn(false);
+  document.querySelector("#btn-admin-logout")?.addEventListener("click", async () => {
+    if (isFirebaseEnabled()) {
+      await logoutAdmin();
+    } else {
+      setAdminLoggedIn(false);
+    }
     closeAdminModal();
-    alert("Logged out of admin.");
+    updateSyncStatus();
+  });
+
+  document.addEventListener("fleet-auth-changed", () => {
+    updateSyncStatus();
   });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   applyCompanyBranding();
   initMap();
+  if (isFirebaseEnabled()) {
+    initFirebase();
+    await waitForAuthReady();
+  }
   await bootstrapFleet();
   bindUiEvents();
 });

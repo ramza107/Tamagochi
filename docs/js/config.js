@@ -1,4 +1,4 @@
-/** Site & admin configuration — change company details and admin password here. */
+/** Cloud sync via Firebase — set enabled: true after one-time setup (see SETUP-RU.md). */
 window.FLEET_CONFIG = {
   company: {
     name: "Transcargo",
@@ -22,8 +22,19 @@ window.FLEET_CONFIG = {
       color: "#1d4ed8",
     },
   },
-  /** Change this password before going live. */
+  /** Used only when firebase.enabled is false (offline demo mode). */
   adminPassword: "fleetadmin",
+  /** Login email hint for admin (must match Firebase user you create). */
+  adminEmail: "dispatch@transcargo.com",
+  firebase: {
+    enabled: false,
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: "",
+  },
   map: {
     center: [39.8283, -98.5795],
     zoom: 4,

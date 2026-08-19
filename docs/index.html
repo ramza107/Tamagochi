@@ -101,6 +101,7 @@
               </span>
             </div>
             <p class="map-updated" id="fleet-updated"></p>
+            <p class="sync-status" id="sync-status"></p>
           </div>
 
           <div class="map-wrap">
@@ -167,6 +168,10 @@
         </div>
         <div class="modal-body">
           <form id="login-form">
+            <div class="form-field hidden" id="admin-email-field">
+              <label for="admin-email">Email</label>
+              <input type="email" id="admin-email" autocomplete="username" />
+            </div>
             <div class="form-field">
               <label for="admin-password">Password</label>
               <input type="password" id="admin-password" autocomplete="current-password" required />
@@ -185,10 +190,8 @@
           <button class="modal-close" data-close-modal aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-          <div class="admin-hint">
-            Click anywhere on the US map to drop a new truck pin. Edit ready dates and equipment
-            below. Changes save in this browser — use <strong>Export fleet.json</strong> to publish
-            updates for all visitors (replace <code>data/fleet.json</code> on the server).
+          <div class="admin-hint" id="admin-hint-text">
+            Sign in, click the map to add trucks, set ready dates, and save.
           </div>
 
           <div class="admin-grid">
@@ -243,9 +246,10 @@
             <button class="btn btn-primary" id="btn-save-truck">Save truck</button>
             <button class="btn btn-secondary" id="btn-new-truck">New</button>
             <button class="btn btn-danger hidden" id="btn-delete-truck">Delete</button>
-            <button class="btn btn-secondary" id="btn-export-fleet">Export fleet.json</button>
-            <button class="btn btn-secondary" id="btn-import-fleet">Import JSON</button>
-            <button class="btn btn-secondary" id="btn-reset-fleet">Reset to server</button>
+            <button class="btn btn-danger hidden" id="btn-clear-all-trucks">Clear all trucks</button>
+            <button class="btn btn-secondary hidden" id="btn-export-fleet">Export backup</button>
+            <button class="btn btn-secondary hidden" id="btn-import-fleet">Import JSON</button>
+            <button class="btn btn-secondary hidden" id="btn-reset-fleet">Reset to server</button>
             <button class="btn btn-secondary" id="btn-admin-logout">Logout</button>
           </div>
           <input type="file" id="fleet-import-input" accept="application/json" class="hidden" />
@@ -263,7 +267,11 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
       crossorigin=""
     ></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="./js/config.js"></script>
+    <script src="./js/firebase-sync.js"></script>
     <script src="./js/fleet.js"></script>
     <script src="./js/map.js"></script>
     <script src="./js/app.js"></script>
