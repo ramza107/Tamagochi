@@ -1,33 +1,21 @@
-# Pulsepet
+# Transcargo — Fleet Availability
 
-Питомец, которого кормит твоя жизнь.
+Website for **Transcargo** (HQ Las Vegas, NV) — 26′ box trucks & 16′ Conestoga trailers nationwide.
 
-## Открыть в браузере
+**Live site:** https://ramza107.github.io/Tamagochi/
 
-**Рабочая ссылка:** https://ramza107.github.io/Tamagochi/
+## Admin
 
-Если страница пустая — сделай **hard refresh**: `Ctrl+Shift+R` (на телефоне открой в Private/Incognito).
+Footer → **Admin** → password `fleetadmin` (change in `docs/js/config.js`).
 
-### Настройки GitHub Pages
-
-Сейчас сайт берётся из ветки **`cursor/pulsepet-mvp-249e`**, папка **`/docs`**.
-
-В https://github.com/ramza107/Tamagochi/settings/pages:
-
-1. Source: **Deploy from a branch**
-2. Branch: **`cursor/pulsepet-mvp-249e`**
-3. Folder: **`/docs`**
-4. Save
-
-(Альтернатива: branch `gh-pages`, folder `/ (root)` — тоже поддерживается.)
-
-## Локально
+## Local preview
 
 ```bash
-npm install
-npm run web
+cd docs
+python3 -m http.server 8080
 ```
 
-## Идея
+## Edit fleet data
 
-**Nuri** — мягкий моховый камешек с янтарным «ядром-пульсом». Сон, шаги и экранное время меняют поведение и письма.
+- Default trucks: `docs/data/fleet.json`
+- Admin export → replace `fleet.json` → push to update for everyone
