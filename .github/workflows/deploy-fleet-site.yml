@@ -1,0 +1,33 @@
+name: Deploy Fleet Site
+
+on:
+  push:
+    branches:
+      - cursor/trucking-fleet-site-249e
+    paths:
+      - "fleet-site/**"
+      - ".github/workflows/deploy-fleet-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: fleet-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: fleet-site
+      - id: deployment
+        uses: actions/deploy-pages@v4

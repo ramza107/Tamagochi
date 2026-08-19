@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="American Box & Conestoga Co. — specialized 26′ box trucks and 16′ Conestoga trailers. View live fleet availability across the USA."
+    />
+    <title>American Box & Conestoga Co.</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <div class="brand">
+          <strong id="brand-name">American Box & Conestoga Co.</strong>
+          <span id="brand-tag">AB&C Freight</span>
+        </div>
+        <nav class="nav">
+          <a href="#equipment">Equipment</a>
+          <a href="#fleet-map-section">Fleet Map</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero-grid">
+          <div>
+            <h1 id="hero-title">American Box & Conestoga Co.</h1>
+            <p id="hero-tagline">
+              Specialized 26′ box trucks & 16′ Conestoga trailers nationwide
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" id="btn-view-map">View Available Trucks</button>
+              <a class="btn btn-secondary" href="#contact">Book a Load</a>
+            </div>
+          </div>
+          <aside class="hero-card">
+            <h3>Dispatch Snapshot</h3>
+            <div class="hero-stat"><span>26′ Box Trucks</span><strong>Dry van · liftgate</strong></div>
+            <div class="hero-stat"><span>16′ Conestoga</span><strong>Tarp · secure loads</strong></div>
+            <div class="hero-stat"><span>Coverage</span><strong>48 states</strong></div>
+            <div class="hero-stat"><span>Updates</span><strong>Daily availability</strong></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section" id="equipment">
+        <div class="container">
+          <div class="section-header">
+            <h2>Our Specialized Equipment</h2>
+            <p>Two focused asset types — no general freight clutter.</p>
+          </div>
+          <div class="equipment-grid">
+            <article class="equipment-card">
+              <span class="badge" style="background: #ea580c">26′ Box</span>
+              <h3>26-foot Box Trucks</h3>
+              <p>
+                Dock-high dry box trucks for regional and short-haul lanes. Liftgate and pallet jack
+                available on select units. Perfect for retail, food-grade, and LTL reloads.
+              </p>
+            </article>
+            <article class="equipment-card">
+              <span class="badge" style="background: #2563eb">16′ Conestoga</span>
+              <h3>16-foot Conestoga Trailers</h3>
+              <p>
+                Rolling tarp Conestoga systems for flatbed-style freight with full weather protection.
+                Ideal for machinery, steel, and oversized palletized loads.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section map-section" id="fleet-map-section">
+        <div class="container">
+          <div class="section-header">
+            <h2>Live Fleet Map — USA</h2>
+            <p>See where our trucks are empty and ready for your next load.</p>
+          </div>
+
+          <div class="map-toolbar">
+            <div class="legend">
+              <span class="legend-item">
+                <span class="legend-dot" style="background: #ea580c"></span>
+                26′ Box Truck
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot" style="background: #2563eb"></span>
+                16′ Conestoga
+              </span>
+            </div>
+            <p class="map-updated" id="fleet-updated"></p>
+          </div>
+
+          <div class="map-wrap">
+            <div id="fleet-map" aria-label="United States fleet availability map"></div>
+          </div>
+
+          <div class="fleet-table-wrap">
+            <table class="fleet-table">
+              <thead>
+                <tr>
+                  <th>Location</th>
+                  <th>Equipment</th>
+                  <th>Ready Date</th>
+                  <th>Status</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="fleet-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="contact">
+        <div class="container">
+          <div class="section-header">
+            <h2>Contact Dispatch</h2>
+            <p>Available 24/7 for brokers and direct shippers.</p>
+          </div>
+          <div class="contact-grid">
+            <article class="contact-card">
+              <h3>Phone</h3>
+              <p><a id="contact-phone-link" href="tel:8885550142"><span id="contact-phone">(888) 555-0142</span></a></p>
+            </article>
+            <article class="contact-card">
+              <h3>Email</h3>
+              <p><a id="contact-email-link" href="mailto:dispatch@abcfreight.com"><span id="contact-email">dispatch@abcfreight.com</span></a></p>
+            </article>
+            <article class="contact-card">
+              <h3>Authority</h3>
+              <p><span id="contact-mc">MC 482917</span><br /><span id="contact-dot">USDOT 3891042</span></p>
+            </article>
+          </div>
+          <p style="margin-top: 1rem; color: var(--muted);">
+            Headquarters: <span id="contact-hq">Kansas City, MO</span>
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <span id="footer-copy">© 2026 American Box & Conestoga Co.</span>
+        <a href="#" class="admin-link" id="admin-entry">Admin</a>
+      </div>
+    </footer>
+
+    <!-- Login -->
+    <div class="modal-backdrop" id="login-modal">
+      <div class="modal login-box">
+        <div class="modal-header">
+          <h2>Admin Login</h2>
+          <button class="modal-close" data-close-modal aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="login-form">
+            <div class="form-field">
+              <label for="admin-password">Password</label>
+              <input type="password" id="admin-password" autocomplete="current-password" required />
+            </div>
+            <button type="submit" class="btn btn-primary">Sign in</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin panel -->
+    <div class="modal-backdrop" id="admin-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Fleet Admin</h2>
+          <button class="modal-close" data-close-modal aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="admin-hint">
+            Click anywhere on the US map to drop a new truck pin. Edit ready dates and equipment
+            below. Changes save in this browser — use <strong>Export fleet.json</strong> to publish
+            updates for all visitors (replace <code>data/fleet.json</code> on the server).
+          </div>
+
+          <div class="admin-grid">
+            <div>
+              <h3 id="admin-form-title">Add or edit truck</h3>
+              <input type="hidden" id="truck-id" />
+              <div class="form-field">
+                <label for="truck-city">City</label>
+                <input id="truck-city" type="text" placeholder="Dallas" />
+              </div>
+              <div class="form-field">
+                <label for="truck-state">State</label>
+                <input id="truck-state" type="text" placeholder="TX" maxlength="2" />
+              </div>
+              <div class="form-field">
+                <label for="truck-equipment">Equipment</label>
+                <select id="truck-equipment">
+                  <option value="box-26">26′ Box Truck</option>
+                  <option value="conestoga-16">16′ Conestoga</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="truck-ready">Ready for load (date)</label>
+                <input id="truck-ready" type="date" />
+              </div>
+            </div>
+            <div>
+              <div class="form-field">
+                <label for="truck-lat">Latitude</label>
+                <input id="truck-lat" type="number" step="0.00001" />
+              </div>
+              <div class="form-field">
+                <label for="truck-lng">Longitude</label>
+                <input id="truck-lng" type="number" step="0.00001" />
+              </div>
+              <div class="form-field">
+                <label for="truck-status">Status</label>
+                <select id="truck-status">
+                  <option value="available">Available</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="in-transit">In transit</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label for="truck-notes">Notes</label>
+                <textarea id="truck-notes" placeholder="Liftgate, team drivers, etc."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="admin-actions">
+            <button class="btn btn-primary" id="btn-save-truck">Save truck</button>
+            <button class="btn btn-secondary" id="btn-new-truck">New</button>
+            <button class="btn btn-danger hidden" id="btn-delete-truck">Delete</button>
+            <button class="btn btn-secondary" id="btn-export-fleet">Export fleet.json</button>
+            <button class="btn btn-secondary" id="btn-import-fleet">Import JSON</button>
+            <button class="btn btn-secondary" id="btn-reset-fleet">Reset to server</button>
+            <button class="btn btn-secondary" id="btn-admin-logout">Logout</button>
+          </div>
+          <input type="file" id="fleet-import-input" accept="application/json" class="hidden" />
+
+          <div class="admin-list">
+            <h3>All trucks</h3>
+            <div id="admin-truck-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./js/config.js"></script>
+    <script src="./js/fleet.js"></script>
+    <script src="./js/map.js"></script>
+    <script src="./js/app.js"></script>
+  </body>
+</html>
