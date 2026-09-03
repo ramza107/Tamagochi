@@ -116,8 +116,8 @@ p {
 .hero-copy {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 2rem var(--gutter) 2.5rem;
+  justify-content: flex-start;
+  padding: 2.25rem var(--gutter) 2.5rem;
   max-width: 34rem;
   animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
