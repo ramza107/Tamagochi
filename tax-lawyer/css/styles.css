@@ -133,9 +133,9 @@ p {
 .hero {
   position: relative;
   isolation: isolate;
-  min-height: calc(100svh - 4rem);
+  min-height: auto;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
 }
@@ -181,7 +181,7 @@ p {
 .hero-frame {
   width: min(var(--max), calc(100% - 2 * var(--pad)));
   margin: 0 auto;
-  padding: 5rem 0 3.25rem;
+  padding: 1.75rem 0 2.5rem;
   display: flex;
   flex-direction: column;
   animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -193,29 +193,29 @@ p {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--signal);
-  margin-bottom: 1.1rem;
+  margin-bottom: 0.75rem;
 }
 
 .hero-name {
-  font-size: clamp(3.8rem, 12vw, 7.4rem);
-  line-height: 0.88;
+  font-size: clamp(3.2rem, 9vw, 5.8rem);
+  line-height: 0.9;
   color: var(--white);
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.85rem;
   max-width: 12ch;
 }
 
 .hero-line {
   max-width: 32rem;
-  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-size: clamp(1.02rem, 1.8vw, 1.15rem);
   color: var(--mist);
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-bottom: 2.75rem;
+  margin-bottom: 1.75rem;
 }
 
 .cta,
@@ -302,7 +302,7 @@ p {
 .band {
   max-width: var(--max);
   margin: 0 auto;
-  padding: 5rem var(--pad);
+  padding: 3.25rem var(--pad) 4rem;
 }
 
 .band-head {
@@ -356,10 +356,10 @@ p {
 .statement {
   max-width: var(--max);
   margin: 0 auto;
-  padding: 1rem var(--pad) 5rem;
+  padding: 0.5rem var(--pad) 3.5rem;
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: 3rem;
+  gap: 2.5rem;
   align-items: start;
 }
 
@@ -528,7 +528,6 @@ p {
     display: none;
   }
 
-  .hero,
   .statement,
   .talk {
     grid-template-columns: 1fr;
@@ -536,12 +535,15 @@ p {
 
   .hero {
     min-height: auto;
-    padding-top: 1.5rem;
   }
 
-  .hero-panel {
-    min-height: 240px;
-    order: -1;
+  .hero-frame {
+    padding-top: 1.25rem;
+    padding-bottom: 2rem;
+  }
+
+  .hero-facts {
+    grid-template-columns: 1fr;
   }
 
   .lanes {
@@ -562,8 +564,7 @@ p {
   }
 
   .hero-frame,
-  .hero-panel,
-  .panel-glow,
+  .stage-wash,
   .reveal {
     animation: none !important;
     transition: none !important;
