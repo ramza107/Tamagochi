@@ -11,7 +11,7 @@
   --line: rgba(158, 201, 234, 0.22);
   --display: "Unbounded", system-ui, sans-serif;
   --body: "Onest", system-ui, sans-serif;
-  --pad: clamp(1.1rem, 4vw, 2.75rem);
+  --pad: clamp(1rem, 3vw, 2rem);
   --max: 1180px;
 }
 
@@ -133,11 +133,11 @@ p {
 .hero {
   position: relative;
   isolation: isolate;
-  min-height: auto;
-  display: flex;
-  align-items: flex-start;
+  min-height: 0;
+  display: block;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
+  padding: 0.35rem var(--pad) 1.75rem;
 }
 
 .hero-stage {
@@ -179,12 +179,12 @@ p {
 }
 
 .hero-frame {
-  width: min(var(--max), calc(100% - 2 * var(--pad)));
+  width: min(var(--max), 100%);
   margin: 0 auto;
-  padding: 1.75rem 0 2.5rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .hero-kicker {
@@ -534,12 +534,12 @@ p {
   }
 
   .hero {
-    min-height: auto;
+    padding-top: 0.25rem;
+    padding-bottom: 1.5rem;
   }
 
   .hero-frame {
-    padding-top: 1.25rem;
-    padding-bottom: 2rem;
+    padding: 0;
   }
 
   .hero-facts {
