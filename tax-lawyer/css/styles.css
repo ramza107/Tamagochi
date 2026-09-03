@@ -89,7 +89,7 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem var(--pad);
+  padding: 0.75rem var(--pad);
   border-bottom: 1px solid transparent;
   transition: background 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
 }
