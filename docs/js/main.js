@@ -1,13 +1,6 @@
 document.getElementById("year").textContent = String(new Date().getFullYear());
 
-const topbar = document.querySelector(".topbar");
-const onScroll = () => {
-  topbar?.classList.toggle("is-solid", window.scrollY > 16);
-};
-onScroll();
-window.addEventListener("scroll", onScroll, { passive: true });
-
-document.querySelectorAll(".lane, .statement blockquote, .pillars li, .talk-copy, .talk-form").forEach((el) => {
+document.querySelectorAll(".service-rows article, .method-list p, .contact-grid > div, #form").forEach((el) => {
   el.classList.add("reveal");
 });
 
@@ -17,33 +10,28 @@ if ("IntersectionObserver" in window) {
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          entry.target.classList.add("in");
+          entry.target.classList.add("show");
           io.unobserve(entry.target);
         }
       });
     },
-    { threshold: 0.15, rootMargin: "0px 0px -6% 0px" }
+    { threshold: 0.12 }
   );
   reveals.forEach((el) => io.observe(el));
 } else {
-  reveals.forEach((el) => el.classList.add("in"));
+  reveals.forEach((el) => el.classList.add("show"));
 }
 
-const form = document.getElementById("talk-form");
-const status = document.getElementById("form-status");
+const form = document.getElementById("form");
+const status = document.getElementById("status");
 
 form?.addEventListener("submit", (event) => {
   event.preventDefault();
   const data = new FormData(form);
-  const name = String(data.get("name") || "").trim();
-  const phone = String(data.get("phone") || "").trim();
-  const message = String(data.get("message") || "").trim();
-
-  if (!name || !phone || !message) {
+  if (![...data.values()].every((v) => String(v).trim())) {
     status.textContent = "Заповніть усі поля.";
     return;
   }
-
   status.textContent = "Дякуємо. Відповімо протягом робочого дня.";
   form.reset();
 });
