@@ -1,279 +1,187 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uk">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Transcargo — specialized 26′ box trucks and 16′ Conestoga trailers. HQ in Las Vegas, fleet availability across the USA."
+      content="Капітель — адвокатське бюро податкового права. Захист бізнесу та фізичних осіб у спорах з податковими органами України."
     />
-    <title>Transcargo | Fleet Availability</title>
+    <title>Капітель — податковий адвокат</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-      crossorigin=""
     />
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <div class="container">
-        <div class="brand">
-          <strong id="brand-name">Transcargo</strong>
-          <span id="brand-tag">Transcargo Logistics</span>
-        </div>
-        <nav class="nav">
-          <a href="#equipment">Equipment</a>
-          <a href="#fleet-map-section">Fleet Map</a>
-          <a href="#contact">Contact</a>
+    <header class="site-header" id="top">
+      <div class="shell header-inner">
+        <a class="logo" href="#top" aria-label="Капітель — на головну">
+          <span class="logo-mark" aria-hidden="true"></span>
+          <span class="logo-text">Капітель</span>
+        </a>
+        <nav class="nav" aria-label="Головна навігація">
+          <a href="#practice">Практики</a>
+          <a href="#approach">Підхід</a>
+          <a href="#contact">Контакти</a>
         </nav>
+        <a class="header-cta" href="#contact">Консультація</a>
       </div>
     </header>
 
     <main>
-      <section class="hero">
-        <div class="container hero-grid">
-          <div>
-            <h1 id="hero-title">Transcargo</h1>
-            <p id="hero-tagline">
-              26′ box trucks & 16′ Conestoga trailers — HQ in Las Vegas, serving all 50 states
-            </p>
-            <div class="hero-actions">
-              <button class="btn btn-primary" id="btn-view-map">View Available Trucks</button>
-              <a class="btn btn-secondary" href="#contact">Book a Load</a>
-            </div>
-          </div>
-          <aside class="hero-card">
-            <h3>Dispatch Snapshot</h3>
-            <div class="hero-stat"><span>26′ Box Trucks</span><strong>Dry van · liftgate</strong></div>
-            <div class="hero-stat"><span>16′ Conestoga</span><strong>Tarp · secure loads</strong></div>
-            <div class="hero-stat"><span>Headquarters</span><strong>Las Vegas, NV</strong></div>
-            <div class="hero-stat"><span>Coverage</span><strong>All 50 states</strong></div>
-            <div class="hero-stat"><span>Updates</span><strong>Daily availability</strong></div>
-          </aside>
+      <section class="hero" aria-labelledby="hero-brand">
+        <div class="hero-atmosphere" aria-hidden="true"></div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-column"></div>
+          <div class="hero-column hero-column-delay"></div>
+          <div class="hero-column hero-column-late"></div>
         </div>
-      </section>
-
-      <section class="section" id="equipment">
-        <div class="container">
-          <div class="section-header">
-            <h2>Our Specialized Equipment</h2>
-            <p>Two focused asset types — no general freight clutter.</p>
-          </div>
-          <div class="equipment-grid">
-            <article class="equipment-card">
-              <span class="badge" style="background: #ea580c">26′ Box</span>
-              <h3>26-foot Box Trucks</h3>
-              <p>
-                Dock-high dry box trucks for regional and short-haul lanes. Liftgate and pallet jack
-                available on select units. Perfect for retail, food-grade, and LTL reloads.
-              </p>
-            </article>
-            <article class="equipment-card">
-              <span class="badge" style="background: #2563eb">16′ Conestoga</span>
-              <h3>16-foot Conestoga Trailers</h3>
-              <p>
-                Rolling tarp Conestoga systems for flatbed-style freight with full weather protection.
-                Ideal for machinery, steel, and oversized palletized loads.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section map-section" id="fleet-map-section">
-        <div class="container">
-          <div class="section-header">
-            <h2>Live Fleet Map — USA</h2>
-            <p>See where our trucks are empty and ready for your next load.</p>
-          </div>
-
-          <div class="map-toolbar">
-            <div class="legend">
-              <span class="legend-item">
-                <span class="legend-dot" style="background: #ea580c"></span>
-                26′ Box Truck
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot" style="background: #2563eb"></span>
-                16′ Conestoga
-              </span>
-            </div>
-            <p class="map-updated" id="fleet-updated"></p>
-            <p class="sync-status" id="sync-status"></p>
-          </div>
-
-          <div class="map-wrap">
-            <div id="fleet-map" aria-label="United States fleet availability map"></div>
-          </div>
-
-          <div class="fleet-table-wrap">
-            <table class="fleet-table">
-              <thead>
-                <tr>
-                  <th>Location</th>
-                  <th>Equipment</th>
-                  <th>Ready Date</th>
-                  <th>Status</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody id="fleet-table-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="contact">
-        <div class="container">
-          <div class="section-header">
-            <h2>Contact Dispatch</h2>
-            <p>Available 24/7 for brokers and direct shippers.</p>
-          </div>
-          <div class="contact-grid">
-            <article class="contact-card">
-              <h3>Phone</h3>
-              <p><a id="contact-phone-link" href="tel:8885550142"><span id="contact-phone">(888) 555-0142</span></a></p>
-            </article>
-            <article class="contact-card">
-              <h3>Email</h3>
-              <p><a id="contact-email-link" href="mailto:dispatch@transcargo.com"><span id="contact-email">dispatch@transcargo.com</span></a></p>
-            </article>
-            <article class="contact-card">
-              <h3>Authority</h3>
-              <p><span id="contact-mc">MC 482917</span><br /><span id="contact-dot">USDOT 3891042</span></p>
-            </article>
-          </div>
-          <p style="margin-top: 1rem; color: var(--muted);">
-            Headquarters: <span id="contact-hq">Las Vegas, NV</span> · Nationwide coverage
+        <div class="shell hero-content">
+          <p class="hero-brand" id="hero-brand">Капітель</p>
+          <h1 class="hero-title">Податковий захист,<br />коли ставки високі</h1>
+          <p class="hero-lead">
+            Адвокатське бюро податкового права для бізнесу та приватних осіб по всій Україні.
           </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#contact">Записатися на консультацію</a>
+            <a class="btn btn-ghost" href="#practice">Наші практики</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section practice" id="practice" aria-labelledby="practice-title">
+        <div class="shell">
+          <header class="section-intro reveal">
+            <h2 id="practice-title">Практики</h2>
+            <p>Одна спеціалізація — податкове право. Без розпорошення на «усе підряд».</p>
+          </header>
+
+          <ol class="practice-list">
+            <li class="practice-item reveal">
+              <span class="practice-num">01</span>
+              <div>
+                <h3>Податкові перевірки</h3>
+                <p>
+                  Супровід документальних та фактичних перевірок ДПС, відповіді на запити,
+                  захист інтересів під час контрольних заходів.
+                </p>
+              </div>
+            </li>
+            <li class="practice-item reveal">
+              <span class="practice-num">02</span>
+              <div>
+                <h3>Податкові спори</h3>
+                <p>
+                  Оскарження ППР, рішення органів ДПС у адміністративному та судовому порядку —
+                  до Верховного Суду включно.
+                </p>
+              </div>
+            </li>
+            <li class="practice-item reveal">
+              <span class="practice-num">03</span>
+              <div>
+                <h3>Структурування та compliance</h3>
+                <p>
+                  Податкове моделювання угод, ПДВ і прибуток, трансфертне ціноутворення,
+                  підготовка до перевірок.
+                </p>
+              </div>
+            </li>
+            <li class="practice-item reveal">
+              <span class="practice-num">04</span>
+              <div>
+                <h3>Кримінально-податковий захист</h3>
+                <p>
+                  Представництво у провадженнях за ст. 212 КК України та суміжними статтями —
+                  від слідства до суду.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section approach" id="approach" aria-labelledby="approach-title">
+        <div class="shell approach-grid">
+          <div class="approach-copy reveal">
+            <h2 id="approach-title">Спокій у складних справах</h2>
+            <p>
+              Працюємо точково: аналізуємо ризики, будуємо позицію на фактах і практиці судів,
+              тримаємо клієнта в курсі на кожному етапі — без зайвого шуму.
+            </p>
+          </div>
+          <ul class="approach-points">
+            <li class="reveal">
+              <strong>Чітка позиція</strong>
+              <span>Стратегія до першого кроку, а не після листа від податкової.</span>
+            </li>
+            <li class="reveal">
+              <strong>Прозора комунікація</strong>
+              <span>Зрозумілі строки, зрозуміла вартість, зрозумілий план дій.</span>
+            </li>
+            <li class="reveal">
+              <strong>Досвід у судах</strong>
+              <span>Фокус на податкових спорах і реальній судовій практиці України.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section contact" id="contact" aria-labelledby="contact-title">
+        <div class="shell contact-layout">
+          <div class="contact-copy reveal">
+            <h2 id="contact-title">Консультація</h2>
+            <p>
+              Опишіть ситуацію коротко — відповімо протягом одного робочого дня та запропонуємо
+              формат зустрічі в Києві або онлайн.
+            </p>
+            <dl class="contact-facts">
+              <div>
+                <dt>Телефон</dt>
+                <dd><a href="tel:+380441234567">+38 (044) 123-45-67</a></dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd><a href="mailto:office@kapitel.ua">office@kapitel.ua</a></dd>
+              </div>
+              <div>
+                <dt>Офіс</dt>
+                <dd>Київ, вул. Хрещатик, 22</dd>
+              </div>
+            </dl>
+          </div>
+
+          <form class="contact-form reveal" id="consult-form" novalidate>
+            <div class="field">
+              <label for="name">Імʼя</label>
+              <input id="name" name="name" type="text" autocomplete="name" required />
+            </div>
+            <div class="field">
+              <label for="phone">Телефон</label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel" required />
+            </div>
+            <div class="field">
+              <label for="message">Коротко про ситуацію</label>
+              <textarea id="message" name="message" rows="4" required></textarea>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Надіслати запит</button>
+            <p class="form-note" id="form-note" role="status" aria-live="polite"></p>
+          </form>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <div class="container">
-        <span id="footer-copy">© 2026 Transcargo</span>
-        <a href="#" class="admin-link" id="admin-entry">Admin</a>
+      <div class="shell footer-inner">
+        <span class="footer-brand">Капітель</span>
+        <p>© <span id="year"></span> Адвокатське бюро «Капітель». Податкове право.</p>
       </div>
     </footer>
 
-    <!-- Login -->
-    <div class="modal-backdrop" id="login-modal">
-      <div class="modal login-box">
-        <div class="modal-header">
-          <h2>Admin Login</h2>
-          <button class="modal-close" data-close-modal aria-label="Close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <form id="login-form">
-            <div class="form-field hidden" id="admin-email-field">
-              <label for="admin-email">Email</label>
-              <input type="email" id="admin-email" autocomplete="username" />
-            </div>
-            <div class="form-field">
-              <label for="admin-password">Password</label>
-              <input type="password" id="admin-password" autocomplete="current-password" required />
-            </div>
-            <button type="submit" class="btn btn-primary">Sign in</button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Admin panel -->
-    <div class="modal-backdrop" id="admin-modal">
-      <div class="modal">
-        <div class="modal-header">
-          <h2>Fleet Admin</h2>
-          <button class="modal-close" data-close-modal aria-label="Close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="admin-hint" id="admin-hint-text">
-            Sign in, click the map to add trucks, set ready dates, and save.
-          </div>
-
-          <div class="admin-grid">
-            <div>
-              <h3 id="admin-form-title">Add or edit truck</h3>
-              <input type="hidden" id="truck-id" />
-              <div class="form-field">
-                <label for="truck-city">City</label>
-                <input id="truck-city" type="text" placeholder="Dallas" />
-              </div>
-              <div class="form-field">
-                <label for="truck-state">State</label>
-                <input id="truck-state" type="text" placeholder="TX" maxlength="2" />
-              </div>
-              <div class="form-field">
-                <label for="truck-equipment">Equipment</label>
-                <select id="truck-equipment">
-                  <option value="box-26">26′ Box Truck</option>
-                  <option value="conestoga-16">16′ Conestoga</option>
-                </select>
-              </div>
-              <div class="form-field">
-                <label for="truck-ready">Ready for load (date)</label>
-                <input id="truck-ready" type="date" />
-              </div>
-            </div>
-            <div>
-              <div class="form-field">
-                <label for="truck-lat">Latitude</label>
-                <input id="truck-lat" type="number" step="0.00001" />
-              </div>
-              <div class="form-field">
-                <label for="truck-lng">Longitude</label>
-                <input id="truck-lng" type="number" step="0.00001" />
-              </div>
-              <div class="form-field">
-                <label for="truck-status">Status</label>
-                <select id="truck-status">
-                  <option value="available">Available</option>
-                  <option value="reserved">Reserved</option>
-                  <option value="in-transit">In transit</option>
-                </select>
-              </div>
-              <div class="form-field">
-                <label for="truck-notes">Notes</label>
-                <textarea id="truck-notes" placeholder="Liftgate, team drivers, etc."></textarea>
-              </div>
-            </div>
-          </div>
-
-          <div class="admin-actions">
-            <button class="btn btn-primary" id="btn-save-truck">Save truck</button>
-            <button class="btn btn-secondary" id="btn-new-truck">New</button>
-            <button class="btn btn-danger hidden" id="btn-delete-truck">Delete</button>
-            <button class="btn btn-danger hidden" id="btn-clear-all-trucks">Clear all trucks</button>
-            <button class="btn btn-secondary hidden" id="btn-export-fleet">Export backup</button>
-            <button class="btn btn-secondary hidden" id="btn-import-fleet">Import JSON</button>
-            <button class="btn btn-secondary hidden" id="btn-reset-fleet">Reset to server</button>
-            <button class="btn btn-secondary" id="btn-admin-logout">Logout</button>
-          </div>
-          <input type="file" id="fleet-import-input" accept="application/json" class="hidden" />
-
-          <div class="admin-list">
-            <h3>All trucks</h3>
-            <div id="admin-truck-list"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
-    ></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="./js/config.js"></script>
-    <script src="./js/firebase-sync.js"></script>
-    <script src="./js/fleet.js"></script>
-    <script src="./js/map.js"></script>
-    <script src="./js/app.js"></script>
+    <script src="./js/main.js"></script>
   </body>
 </html>
