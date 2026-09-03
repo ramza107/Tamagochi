@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Pulsepet",
+    "slug": "pulsepet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4EBDD"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pulsepet.app",
+      "infoPlist": {
+        "CFBundleDisplayName": "Pulsepet"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E5E1D4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.pulsepet.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Pulsepet"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "baseUrl": "/Tamagochi"
+    }
+  }
+}
