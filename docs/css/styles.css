@@ -131,21 +131,59 @@ p {
 }
 
 .hero {
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  position: relative;
+  isolation: isolate;
   min-height: calc(100svh - 4rem);
-  max-width: var(--max);
-  margin: 0 auto;
-  padding: 2.5rem var(--pad) 3.5rem;
-  gap: 2rem;
-  align-items: stretch;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+
+.hero-stage {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(125deg, #02101f 8%, #0a3d6d 48%, #031528 100%);
+}
+
+.stage-wash {
+  position: absolute;
+  inset: -10% -5%;
+  background:
+    radial-gradient(ellipse 55% 45% at 78% 30%, rgba(110, 190, 255, 0.38), transparent 60%),
+    radial-gradient(ellipse 40% 50% at 18% 85%, rgba(20, 90, 150, 0.35), transparent 55%);
+  animation: drift 10s ease-in-out infinite alternate;
+}
+
+.stage-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(180, 220, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180, 220, 255, 0.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(120deg, transparent 10%, #000 45%, #000 70%, transparent 95%);
+  opacity: 0.55;
+}
+
+.stage-beam {
+  position: absolute;
+  width: 42%;
+  height: 140%;
+  right: 8%;
+  top: -20%;
+  background: linear-gradient(180deg, transparent, rgba(120, 190, 255, 0.16), transparent);
+  transform: rotate(18deg);
+  filter: blur(2px);
 }
 
 .hero-frame {
+  width: min(var(--max), calc(100% - 2 * var(--pad)));
+  margin: 0 auto;
+  padding: 5rem 0 3.25rem;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding-bottom: 1rem;
   animation: rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -155,85 +193,90 @@ p {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--signal);
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.1rem;
 }
 
 .hero-name {
-  font-size: clamp(3.4rem, 11vw, 6.8rem);
-  line-height: 0.9;
+  font-size: clamp(3.8rem, 12vw, 7.4rem);
+  line-height: 0.88;
   color: var(--white);
-  margin-bottom: 1.4rem;
+  margin-bottom: 1.2rem;
+  max-width: 12ch;
 }
 
 .hero-line {
-  max-width: 28rem;
-  font-size: 1.15rem;
+  max-width: 32rem;
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
   color: var(--mist);
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
-.cta {
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2.75rem;
+}
+
+.cta,
+.cta-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: flex-start;
-  padding: 0.95rem 1.4rem;
+  padding: 0.95rem 1.35rem;
+  font-weight: 700;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.cta {
   background: var(--signal);
   color: var(--night);
-  font-weight: 700;
-  border: none;
-  transition: background 0.2s ease, transform 0.2s ease;
+  border: 1px solid var(--signal);
 }
 
 .cta:hover {
   background: var(--fog);
+  border-color: var(--fog);
   transform: translateY(-1px);
 }
 
-.hero-panel {
-  position: relative;
-  overflow: hidden;
-  min-height: 420px;
-  border: 1px solid var(--line);
-  background:
-    linear-gradient(145deg, rgba(13, 74, 122, 0.55), rgba(3, 16, 31, 0.2)),
-    linear-gradient(180deg, #0a3a66, #041528);
-  animation: rise 1s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
-}
-
-.panel-glow {
-  position: absolute;
-  width: 140%;
-  height: 70%;
-  left: -20%;
-  top: -10%;
-  background: radial-gradient(circle, rgba(78, 163, 224, 0.45), transparent 62%);
-  animation: drift 8s ease-in-out infinite alternate;
-}
-
-.panel-lines {
-  position: absolute;
-  inset: 0;
-  background:
-    repeating-linear-gradient(
-      -18deg,
-      transparent,
-      transparent 28px,
-      rgba(158, 201, 234, 0.07) 28px,
-      rgba(158, 201, 234, 0.07) 29px
-    );
-}
-
-.panel-label {
-  position: absolute;
-  left: 1.25rem;
-  bottom: 1.25rem;
-  margin: 0;
-  font-family: var(--display);
-  font-size: 0.85rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.cta-ghost {
+  background: transparent;
   color: var(--fog);
+  border: 1px solid rgba(158, 201, 234, 0.35);
+}
+
+.cta-ghost:hover {
+  border-color: var(--signal);
+  color: var(--white);
+}
+
+.hero-facts {
+  list-style: none;
+  margin: 0;
+  padding: 1.25rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  border-top: 1px solid var(--line);
+  max-width: 42rem;
+}
+
+.hero-facts li {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.hero-facts strong {
+  font-family: var(--display);
+  font-size: 0.98rem;
+  letter-spacing: -0.02em;
+  color: var(--white);
+}
+
+.hero-facts span {
+  font-size: 0.86rem;
+  color: var(--muted);
 }
 
 @keyframes rise {
@@ -252,7 +295,7 @@ p {
     transform: translate(0, 0) scale(1);
   }
   to {
-    transform: translate(4%, 6%) scale(1.08);
+    transform: translate(3%, 4%) scale(1.05);
   }
 }
 
@@ -485,7 +528,6 @@ p {
     display: none;
   }
 
-  .hero,
   .statement,
   .talk {
     grid-template-columns: 1fr;
@@ -493,12 +535,14 @@ p {
 
   .hero {
     min-height: auto;
-    padding-top: 1.5rem;
   }
 
-  .hero-panel {
-    min-height: 240px;
-    order: -1;
+  .hero-frame {
+    padding-top: 3.5rem;
+  }
+
+  .hero-facts {
+    grid-template-columns: 1fr;
   }
 
   .lanes {
@@ -519,8 +563,7 @@ p {
   }
 
   .hero-frame,
-  .hero-panel,
-  .panel-glow,
+  .stage-wash,
   .reveal {
     animation: none !important;
     transition: none !important;
